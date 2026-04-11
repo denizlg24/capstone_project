@@ -16,7 +16,6 @@
   info: [Projeto Integrador 25/26, L.EIC, FEUP],
 )
 
-#table-of-contents()
 
 #slide(title: "O Problema: Mapeamento em CGRA", outlined: true)[
   #cols(columns: (1fr, 0.6fr), gutter: 2em)[
@@ -62,6 +61,35 @@
   - Corremos o gerador de features, para anotar o grafo de DFG com as features necessárias para a GNN.
   - Corremos o gerador de labels, que usa a GNN treinada para gerar os 4 labels para cada nó do DFG, (apenas usamos as ultimas 2)
   - Finalmente, usamos os labels para dar prune a literais do SAT-MapIt, reduzindo o search space e acelerando o solver.
+]
+
+#slide(title: "O que foi implementado?", outlined: true)[
+  Para reduzir o _search space_ do SAT-MapIt, utilizo as labels de *Spatial Mapping Distance* e *Temporal Mapping Distance*, que fornecem uma estimativa da distância espacial e temporal entre pares de nós do DFG. Antes de chamar a função `solve`, é executada uma fase de _pruning_ sobre os literais candidatos, eliminando combinações de mapeamentos que violam essas previsões.
+
+  Em concreto, para cada *forward edge* `(src, dst)` do DFG:
+  - obtêm-se as previsões `pred_spatial` e `pred_temporal` produzidas pela GNN;
+  - enumeram-se todos os pares possíveis de literais entre o nó de origem e o nó de destino;
+  - para cada par, calcula-se a distância espacial real através da distância de Manhattan entre PEs:
+    $ d_"spatial" = abs("row"_s - "row"_d) + abs("col"_s - "col"_d) $
+
+  - calcula-se também a distância temporal real:
+    $ d_"temporal" = "CycleDistance"("cycle"_s, "cycle"_d, II) $
+
+  Se uma destas distâncias exceder a previsão da GNN mais a respetiva tolerância, então o par é removido do espaço de procura:
+  $
+    d_"spatial" > "pred_spatial" + "spatial_tolerance"
+    or
+    d_"temporal" > "pred_temporal" + "temporal_tolerance"
+  $
+
+  Quando isso acontece, é adicionada ao SAT uma cláusula de exclusão que impede esse mapeamento conjunto:
+  $
+    not("lit"_s and "lit"_d)
+  $
+  equivalente em CNF a:
+  $
+    not "lit"_s or not "lit"_d
+  $
 ]
 
 #slide(title: "Próximos Passos", outlined: true)[
