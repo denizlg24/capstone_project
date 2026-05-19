@@ -1,8 +1,47 @@
 \documentclass[10pt]{article}
-\usepackage[portuguese]{babel} % para indice em português
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
 \usepackage{url}
 \usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{float}
+\usepackage[hidelinks]{hyperref}
+\usepackage[nonumberlist=false,nopostdot,toc]{glossaries}
 \graphicspath{ {./figures/} }
+
+\makeglossaries
+
+\newglossaryentry{ai}{name={AI},description={\textit{Artificial Intelligence}; field of computing dedicated to techniques that enable systems with adaptive or learned behaviour.}}
+\newglossaryentry{cgra}{name={CGRA},description={\textit{Coarse-Grained Reconfigurable Architecture}; reconfigurable architecture composed of an array of configurable processing units.}}
+\newglossaryentry{dag}{name={DAG},description={\textit{Directed Acyclic Graph}; directed graph with no cycles, used here as the underlying structure of a DFG.}}
+\newglossaryentry{dfg}{name={DFG},description={\textit{Data Flow Graph}; directed graph that represents operations as nodes and data dependencies as edges.}}
+\newglossaryentry{feup}{name={FEUP},description={\textit{Faculdade de Engenharia da Universidade do Porto}; Faculty of Engineering of the University of Porto.}}
+\newglossaryentry{gnn}{name={GNN},description={\textit{Graph Neural Network}; neural network designed to process data structured as graphs.}}
+\newglossaryentry{inesctec}{name={INESC TEC},description={\textit{Instituto de Engenharia de Sistemas e Computadores, Tecnologia e Ci\^encia}; Institute for Systems and Computer Engineering, Technology and Science.}}
+\newglossaryentry{json}{name={JSON},description={\textit{JavaScript Object Notation}; text-based format used to store and exchange structured data.}}
+\newglossaryentry{kms}{name={KMS},description={\textit{Kernel Mobility Schedule}; modulo-scheduling construct that bounds the cycles in which each operation may be issued, used by SAT-MapIt~\cite{satmapit2023} to reduce the SAT search space.}}
+\newglossaryentry{lisa}{name={LISA},description={\textit{Graph Neural Network Based Portable Mapping on Spatial Accelerators}~\cite{lisa2022}; GNN-based approach used to guide mapping on spatial accelerators.}}
+\newglossaryentry{lisagnn}{name={LISA-GNN},description={GNN module used in the prototype, inspired by the LISA~\cite{lisa2022} approach, to predict priorities for DFG nodes.}}
+\newglossaryentry{pe}{name={PE},description={\textit{Processing Element}; individual processing unit within the CGRA.}}
+\newglossaryentry{sat}{name={SAT},description={\textit{Boolean Satisfiability}; problem of determining whether an assignment exists that satisfies a set of Boolean constraints.}}
+\newglossaryentry{satmapit}{name={SAT-MapIt},description={SAT-based mapper for CGRAs~\cite{satmapit2023}, used as a technical reference in this project.}}
+\newglossaryentry{sdg}{name={SDG},description={\textit{Sustainable Development Goals}; United Nations Sustainable Development Goals.}}
+\newglossaryentry{smt}{name={SMT},description={\textit{Satisfiability Modulo Theories}; generalisation of SAT with theories such as arithmetic, arrays and bit-vectors.}}
+\newglossaryentry{z3}{name={Z3},description={SMT/SAT solver~\cite{z3} used to discharge the mapping constraints in the prototype.}}
+\newglossaryentry{label0}{name={label0},description={Label predicted by the LISA-GNN and used as a priority in the greedy partitioner.}}
+\newglossaryentry{mapping}{name={Mapping},description={Process of assigning the operations of a DFG to the physical resources of the CGRA.}}
+\newglossaryentry{mapper}{name={Mapper},description={Component that searches for or verifies a mapping solution.}}
+\newglossaryentry{oneshot}{name={One-shot},description={Model in which a partition of the DFG is mapped onto a single spatial configuration of the CGRA.}}
+\newglossaryentry{asap}{name={ASAP},description={\textit{As Soon As Possible}; classical scheduling priority that schedules each operation at the earliest cycle compatible with its data dependencies.}}
+\newglossaryentry{alap}{name={ALAP},description={\textit{As Late As Possible}; classical scheduling priority that schedules each operation at the latest cycle compatible with its data dependencies.}}
+\newglossaryentry{alu}{name={ALU},description={\textit{Arithmetic Logic Unit}; combinational unit inside a PE that performs the arithmetic and logical operations of the supported opcodes.}}
+\newglossaryentry{llvm}{name={LLVM},description={Compiler infrastructure project providing modular and reusable compiler and toolchain technologies, used by the reference LISA flow.}}
+\newglossaryentry{leec}{name={L.EEC},description={\textit{Licenciatura em Engenharia Eletrot\'ecnica e de Computadores}; Bachelor's Degree in Electrical and Computer Engineering at FEUP.}}
+\newglossaryentry{cgrame}{name={CGRA-ME},description={\textit{CGRA Modelling and Exploration}; open-source CGRA design framework used as the architecture template by the modified SAT-MapIt in this project.}}
+\newglossaryentry{navimap}{name={NaviMap},description={GNN plus deep-Q-network mapping approach for CGRAs, considered and ultimately discarded as a third leg of the prototype.}}
+\newglossaryentry{dqn}{name={DQN},description={\textit{Deep Q-Network}; reinforcement learning agent that approximates the Q-function with a deep neural network.}}
 
 
 
@@ -16,7 +55,7 @@
 
 
 		\vspace{0.5cm}
-		Relatório Final do Projeto Integrador
+		Capstone Project Final Report
 
 		\vspace{1.5cm}
 
@@ -30,16 +69,16 @@
 
 
 
-		Licenciatura em Engenharia Informática e Computação
+		Bachelor’s in Informatics and Computing Engineerin
 
 		\vspace{0.8cm}
 
 
-		\textbf{Tutor na U.Porto}: Professor João Cardoso\\
-		\textbf{Orientador na empresa/Proponente}: Professor Nuno Paulino  \\ %Se diferente do tutor
+		\textbf{U.Porto’s Tutor}: Professor João Cardoso\\
+		\textbf{Company’s Tutor}: Professor Nuno Paulino  \\
 
 		\vspace{0.4cm}
-		Data
+		June 2026
 
 	\end{center}
 \end{titlepage}
@@ -53,91 +92,559 @@
 
 \clearpage
 
-\section{Introdução}
+\printglossary[title=Glossary,toctitle=Glossary]
+
+\clearpage
+
+\section{Introduction}
+\glsadd{ai}\glsadd{gnn}\glsadd{dfg}\glsadd{cgra}\glsadd{feup}\glsadd{inesctec}\glsadd{lisa}\glsadd{lisagnn}\glsadd{sat}
+
+\subsection{Context}
+
+This report documents the work carried out in the Capstone Project course unit, part of the Bachelor's Degree in Informatics and Computing Engineering at the Faculty of Engineering of the University of Porto (FEUP), during the second semester of the 2025/2026 academic year.
+
+The project was developed at \textbf{INESC TEC}, under the supervision of Professor Nuno Paulino and the tutorship of Professor João Cardoso. The goal was to investigate and implement an approach inspired by LISA\cite{lisa2022}, based on \textit{Graph Neural Networks} (GNNs), for the \textit{mapping} of \textit{Data Flow Graphs} (DFGs) onto \textit{Coarse-Grained Reconfigurable Architectures} (CGRAs).
+
+INESC TEC is an associate laboratory active in engineering and computer science, hosting applied research in compilation and reconfigurable architectures, which are the areas in which this project is positioned.
 
 
 
-\subsection{Enquadramento}
+\subsection{Goals and expected results}
 
-Este relatório documenta o trabalho desenvolvido no âmbito da unidade curricular de Projeto Integrador, parte integrante do plano de estudos da Licenciatura em Engenharia Informática e Computação da Faculdade de Engenharia da Universidade do Porto (FEUP), durante o segundo semestre do ano letivo 2025/2026.
-
-O projeto decorreu no \textbf{INESC TEC}, sob a orientação do Professor Nuno Paulino e a tutoria do Professor João Cardoso, e teve como objetivo principal a investigação e implementação de uma abordagem baseada em \textit{Graph Neural Networks} (GNN) para o \textit{mapping} de \textit{Data Flow Graphs} (DFGs) em \textit{Coarse-Grained Reconfigurable Architectures} (CGRAs).
-
-O INESC TEC é um laboratório associado de referência nacional, dedicado à investigação e desenvolvimento tecnológico em diversas áreas da engenharia e das ciências da computação.
-
-
-
-\subsection{Objetivos e resultados esperados}
-
-Os objetivos definidos para o projeto foram os seguintes:
+The goals defined for the project were the following:
 
 \begin{itemize}
-	\item Investigar o estado da arte em técnicas de \textit{mapping} de DFGs para CGRAs, com foco em abordagens que utilizassem \textit{AI}.
-	\item Desenvolver um protótipo de sistema que inovasse nas abordagens existents de estado da arte, utilizando \textit{AI}.
-	\item Avaliar e comparar a eficácia da solução desenvolvida através de experimentação e comparação com abordagens existentes.
+	\item Study the state of the art on \textit{mapping} of DFGs to CGRAs, in particular GNN-based approaches inspired by LISA.
+	\item Build a prototype that departs from current approaches by using GNNs to guide \textit{mapping} decisions.
+	\item Evaluate the solution with end-to-end examples and contrast it with a purely algorithmic strategy.
 \end{itemize}
 
-\subsection{Estrutura do relatório}
+\subsection{Report structure}
 
-Explicar a estrutura do relatório.
-
-
-
-
-\section{Metodologia utilizada e principais atividades desenvolvidas}
-
-\subsection{Metodologia utilizada}
-
-Descrever a metodologia\cite{despa2014comparative} seguida (exemplo: desenvolvimento iterativo com sprints quinzenais e reuniões semanais de acompanhamento) e recursos utilizados (exemplo: GitHub \cite{github}, etc.).
-
-
-\subsection{Intervenientes, papéis e responsabilidades}
-
-Identificar a equipa de projeto, stakeholders e outros invernientes com os quais existiu interação; no caso de trabalho em grupo, clarificar os papéis e responsabilidades de cada elemento do grupo.
-
-\subsection{Atividades desenvolvidas}
-
-Descrever as atividades realizadas ao londo do tempo (incluindo eventos relevantes, como apresentações, reuniões com clientes, etc.) e respectivos deliverables, recorrendo tipicamente a um diagrama de Gantt\cite{gantt} e a uma descrição sumária de cada atividade/deliverable.
-
-
-\section{Desenvolvimento da solução}
-
-\subsection{Requisitos}
-
-Identificar os requisitos funcionais e não funcionais relevantes e respectivas fontes, bem como restrições ao projeto.
-
-\subsection{Arquitetura e tecnologias}
-
-Arquitetura e tecnologias utilizadas e respetiva justificação, diagramas técnicos elabordos, dificuldades técnicas encontradas e sua resolução, etc.
-
-\subsection{Solução desenvolvida}
-
-Apresentar a solução desenvolvida na ótica do utilizador, com ajuda de screenshots.
-
-\subsection{Validação}
-
-Descrição da validação da solução desenvolvida (por exemplo, resultados de avaliação experimental, testes efetuados, feedback de utilizadores ou especialistas, etc.).
-
-
-\section{Conclusões}
+The next section frames the methodology, stakeholders and activities. The
+development section describes the DFG model, the CGRA model, the
+partitioning, the materialisation of dependencies between partitions, the
+SAT validation and the integration of the LISA-GNN. The experimental
+validation, known limitations and future work follow.
 
 
 
-\subsection{Resultados alcançados}
-Sumariar os resultados alcançados e contribuições (em relação aos objetivos).
 
-No caso de trabalho em grupo, clarificar as contribuições individuais, em termos qualitativos e quantitativos (percentagem).
-\subsection{Lições aprendidas}
-Refletir sobre as lições aprendidas (tendo em conta os objetivos de aprendizagem).
+\section{Methodology and main activities}
+\glsadd{ai}\glsadd{json}\glsadd{leec}\glsadd{cgra}\glsadd{dfg}\glsadd{gnn}\glsadd{lisa}\glsadd{lisagnn}\glsadd{satmapit}\glsadd{kms}\glsadd{llvm}\glsadd{cgrame}\glsadd{navimap}\glsadd{dqn}\glsadd{label0}\glsadd{asap}\glsadd{alap}\glsadd{pe}\glsadd{oneshot}\glsadd{mapping}\glsadd{mapper}\glsadd{sat}
 
-\subsection{Trabalho futuro}
+\subsection{Methodology}
 
-Ideias de melhorias e trabalho futuro.
+This project was conducted at INESC TEC in a hybrid model. I had the
+flexibility to work on the project remotely and to communicate with my
+supervisors and the rest of the team through a Slack\cite{slack} workspace
+that belongs to the team and to which I was invited.
 
-\subsection{Impacto ODS}
+Throughout the process, weekly meetings were held in the INESC TEC room
+in which I presented what had been accomplished during the week and we
+discussed the results and what should be addressed in the following one.
+For these meetings I prepared a short presentation of about 5-10 minutes.
+These meetings were an opportunity not only to clarify questions about the 
+project and its implementation, but also to receive feedback from the supervisors
+regarding the current state of the prototype and the features to be
+integrated next. This is also why the project requirements evolved
+significantly over the semester: although the main objective was clear
+(use \textit{AI} to guide the mapping process), the
+structure of the pipeline and exactly which state of the art approaches to follow
+were not fixed at the start, and the meetings were essential to decide
+which ideas were appropriate given the project's goals and duration.
 
-Caso aplicável, identificar a contribuição do trabalho para os Objetivos de Desenvolvimento Sustentável (ODS) estabelecidos pelas
-Nações Unidas (https://sdgs.un.org/goals), com vista a um futuro mais sustentável e inclusivo.
+The development overall followed an iterative
+methodology\cite{despa2014comparative}, well suited to a research project
+of this nature. The project was developed inside a private
+GitLab\cite{gitlab} repository belonging to the team.
+
+The technical resources used were:
+
+\begin{itemize}
+	\item GitLab\cite{gitlab} for version control.
+	\item Slack\cite{slack} for day-to-day communication with the team.
+\end{itemize}
+
+
+\subsection{Stakeholders, roles and responsibilities}
+
+The project was developed individually by Deniz Lopes Günes.
+
+\begin{itemize}
+	\item \textbf{Deniz Lopes Günes (author)}: literature review,
+	      implementation of the DFG generator, the partitioner, the integration of the SAT solver,
+		  the adaptation of SAT-MapIt, the training and inference of the LISA-GNN,
+		  the end-to-end examples and the writing of the report.
+	\item \textbf{Francisco Mouro Sampaio Nunes (team colleague, L.EEC)}: developed a project vertical to mine, responsible for generating the code
+	used to configure the \textit{CGRA} from the \textit{mappings} produced.
+	\item \textbf{Professor Nuno Paulino (main supervisor, INESC TEC)}: technical guidance, definition of goals, critical review of the work and validation of the results.
+	\item \textbf{Guilherme Cruz (co-supervisor, INESC TEC)}: technical support and discussion of implementation strategies.
+	\item \textbf{Henrique Teixeira (co-supervisor, INESC TEC)}: technical support and discussion of implementation strategies.
+	\item \textbf{Professor João Cardoso (tutor, FEUP)}: academic
+	      accompaniment, alignment with the course unit's requirements and
+	      critical review of the report.
+\end{itemize}
+
+\subsection{Activities carried out}
+
+The technical activities can be grouped into the following blocks:
+
+\begin{itemize}
+	\item \textbf{DFG representation}: definition of a JSON format for
+	      nodes, operations, constants, metadata and dependency edges.
+	\item \textbf{Example generation}: creation of synthetic graphs inspired
+	      by matrix multiplication and convolution patterns.
+	\item \textbf{Partitioning}: development of strategies to split
+	      graphs that do not fit in a single CGRA configuration.
+	\item \textbf{Materialisation}: conversion of inter-partition dependencies
+	      into synthetic \textit{load}/\textit{store} nodes.
+	\item \textbf{\textit{Mapping} validation}: SAT verification of each
+	      materialised partition, respecting operation compatibility,
+	      connectivity between PEs and resource limits.
+	\item \textbf{LISA-GNN integration}: use of \textit{label0} predictions
+	      as a priority for node selection in the greedy partitioner.
+	\item \textbf{Evaluation}: execution of end-to-end examples and collection of
+	      metrics on partitioning, cuts and SAT validation.
+\end{itemize}
+
+The initial phases (study, DFG generation,
+partitioning) took place between the start of the semester and mid-March;
+the LISA-GNN integration and the end-to-end pipeline were consolidated in May;
+the evaluation and report writing followed in the final weeks.
+
+The remainder of this section walks through the project's evolution
+meeting by meeting, which is the most faithful way to describe how the
+direction of the work was iteratively reshaped.
+
+\subsubsection{First meeting (20 February 2026)}
+
+The first meeting was used to re-introduce the team, agree on the
+communication channel (Slack) and align on the immediate reading
+material. I was tasked with surveying the state of the art on graph
+\textit{mapping} for CGRAs, in particular GNN-based approaches, so that
+the next meeting could be grounded on concrete papers rather than on the
+generic proposal.
+
+\subsubsection{Second meeting (27 February 2026)}
+
+After the initial reading pass, the supervisors asked me to bring a
+dataset of DFGs of the kind used in the state-of-the-art papers, to
+review two or three of the most cited mappers, and to try out a
+conventional mapper as a baseline. The discussion also opened two
+questions that would stay with the project until the end: how to check
+that a \textit{mapping} is valid, and how to represent a CGRA as a
+graph. The recommendation was to keep both representations as simple as
+possible.
+
+\subsubsection{Third meeting (6 March 2026)}
+
+By the third meeting I had cloned the LISA\cite{lisa2022} DFG generator
+and produced a first synthetic dataset of graphs. Reproducing the LISA
+flow end-to-end ran into a practical blocker: LISA itself relies on
+\textit{Gurobi} on top of an \textit{LLVM} build, and the \textit{LLVM} dependency could not be
+installed cleanly in the working environment. In parallel, I started
+reading SAT-MapIt\cite{satmapit2023}, which uses a \textit{Kernel Mobility
+Schedule} (KMS), a construct from \textit{modulo scheduling} that bounds the
+cycles in which each operation may be issued, to reduce the SAT search
+space. The key idea that came out of this meeting was the one that ended up
+defining the whole project: rather than picking one of the two
+approaches, combine them. Use the LISA-style GNN to add constraints to
+the graph, and let a SAT-based mapper consume those constraints.
+
+\subsubsection{Fourth meeting (20 March 2026)}
+
+Two things were settled in this meeting. First, the LISA flow was
+reproduced for the homogeneous case: 1000 DFGs were generated for a
+$4 \times 4$ CGRA and another 1000 for an $8 \times 8$ CGRA, although
+mapping all of them with the reference flow turned out to be impractical
+(roughly 40 graphs mapped in a full day of runtime for the $4 \times 4$
+case). Second, I started reading \textit{NaviMap}, a GNN-plus-\textit{deep-Q-network}
+mapping approach, and we discussed whether the LISA labels could be fed
+into a NaviMap-like agent. The idea was left open as a possible third
+leg of the prototype, to be evaluated in the following meeting after a
+deeper read of the paper.
+
+\subsubsection{Fifth meeting (27 March 2026)}
+
+This meeting was when the NaviMap direction was dropped. After a closer
+read, combining a \textit{deep-Q-network} agent on top of the GNN labels turned
+out to add significant implementation and training complexity, having to
+handle different input shapes for the Neural Networks as well as a lack of 
+open-source availability from NaviMap, without a clear advantage
+over the simpler LISA-plus-SAT-MapIt pairing for the scale of graphs we
+were targeting. The decision was therefore to set NaviMap aside and to
+concentrate the remaining effort on the LISA-style labels combined with
+the SAT mapper.
+
+\subsubsection{Sixth meeting (10 April 2026)}
+
+The discussion in this meeting was almost entirely about the
+\textit{codegen} side of the project, led by Francisco. From my side,
+the main takeaway was that the mapping flow had to produce a clean,
+stable JSON output, so that the downstream code generation could
+consume it without further negotiation about the format.
+
+\subsubsection{Seventh meeting (17 April 2026)}
+
+At this point I had a Python \texttt{CGRA} class that is passed to the
+mapper, LISA was producing four labels per node (used as features), and
+the modified SAT-MapIt was producing ground-truth mappings using two of
+those labels (temporal and spatial distance) on top of a \textit{CGRA-ME}-style
+template. The meeting surfaced a real, recurring problem: the DFG
+formats used by LISA and by SAT-MapIt did not agree. LISA worked with a
+small set of operations (\texttt{const}, \texttt{load}, \texttt{store},
+\texttt{add}, \texttt{mul}, \texttt{sub}, \ldots), whereas SAT-MapIt
+also reasoned about branches, \textit{live-ins}/\textit{live-outs} and other entities.
+The action item was to consolidate a single input format and intermediate
+JSON, under the assumption that everything is one-shot, and to check
+whether SAT-MapIt could be coerced into a one-shot regime. This meeting was
+when we decided to simplify the problem by focusing on one-shot mapping with no temporal constraints.
+
+\subsubsection{Eighth meeting (24 April 2026)}
+
+This is the meeting in which the eventual shape of the prototype was
+decided. The problem on the table was that SAT-MapIt is built around
+\textit{modulo scheduling}, its notion of an \textit{initiation
+interval}, and the way it places operations across cycles all assume
+that regime, whereas LISA is essentially agnostic to it and produces
+per-node features without committing to a schedule. Plugging the LISA
+labels straight into SAT-MapIt therefore did not collapse cleanly into
+the one-shot model we wanted. My suggestion was to invert the
+approach: take a large DFG, run a learned model on it to obtain
+per-node features, use those features to \emph{split} the graph in such
+a way that the cut introduces synthetic loads and stores, and then one-shot
+\textit{map} each subgraph with the SAT mapper. The open question
+became how to perform the split itself, whether by a heuristic or by
+another learned component.
+
+\subsubsection{Ninth meeting (30 April 2026)}
+
+The ninth meeting confirmed that the partitioned one-shot strategy
+worked. A greedy partitioner was already in place, not yet driven by a
+GNN, but by hand-crafted priorities such as \textit{ASAP}, \textit{ALAP} and edge count —
+whose objective was to minimise the number of edges cut at the
+partition boundary, and thus the number of synthetic loads and stores
+needed to keep memory operations outside of the CGRA's ALU array. The
+splitting was working and each subgraph was being mapped one-shot with
+the modified SAT-MapIt to produce ground truth. From here the plan was
+clean: use the original large graph, augmented with the per-partition
+timesteps as an extra feature, to train a GNN that predicts the
+schedule order (\textit{label0}); then feed \textit{label0} into the
+partitioner to obtain better partitions, and finally let SAT-MapIt map
+each partition. This is the flow that ended up being reported in this
+document.
+
+
+\section{Development of the solution}
+\glsadd{dfg}\glsadd{cgra}\glsadd{pe}\glsadd{dag}\glsadd{sat}\glsadd{smt}\glsadd{z3}\glsadd{alu}\glsadd{oneshot}\glsadd{mapping}\glsadd{mapper}\glsadd{lisagnn}\glsadd{gnn}\glsadd{json}\glsadd{label0}\glsadd{ai}
+
+\subsection{Requirements}
+
+The project was always very open-ended in terms of the technical solution, as long as it
+iterated on state of the art approaches using \textit{AI}. One technical constraint was to
+agree on a JSON format for the output since another project for the codegen part was being
+developed in parallel, and the mapping output had to be clean and stable for that project to consume it without further negotiation.
+
+The prototype does not cover cycle-by-cycle temporal scheduling. The SAT
+\textit{mapper} only verifies the spatial validity of each partition, that is,
+it assumes that internal dependencies are resolved by direct connections
+between PEs in the same configuration.
+
+\subsection{Architecture and technologies}
+
+The solution was implemented in Python and organised as a modular pipeline:
+
+\begin{center}
+\texttt{DFG generation} $\rightarrow$
+\texttt{LISA-GNN inference} $\rightarrow$
+\texttt{partitioning} $\rightarrow$
+\texttt{materialisation} $\rightarrow$
+\texttt{SAT mapping}
+\end{center}
+
+The generator creates synthetic data flow graphs. The LISA-GNN inference
+module computes predictions for the graph nodes. The partitioner receives the
+DFG, the CGRA description and, optionally, those predictions. The result is an
+ordered sequence of partitions, each one converted into a materialised DFG.
+Finally, each partition is verified by a SAT mapper implemented with
+Z3\cite{z3} and exported as a PE configuration.
+
+\subsubsection{DFG model}
+
+A DFG is modelled as a directed acyclic graph (DAG) in which the nodes
+represent operations and the edges represent data dependencies. Constants are
+root nodes and memory operations are represented explicitly through
+\texttt{load} and \texttt{store}. In the current model, all edges have zero
+distance, that is, a dependency inside a partition must be satisfied in the
+same one-shot configuration.
+
+\subsubsection{CGRA model}
+
+The CGRA is described by a grid of PEs. Each PE can support a subset of
+operations and, in some architectures, only some PEs can perform memory
+operations. The topology defines which PEs are directly connected. In the
+current experiments a homogeneous $4 \times 4$ CGRA with five registers per
+PE was used. Figure~\ref{fig:cgra-4x4} shows the canonical layout we
+assume: a 2D grid of PEs, with data and instruction memories on the
+side, where each PE is essentially an \textit{ALU} with a local register file
+and can operate on the results delivered by its neighbouring PEs.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.75\textwidth]{cgra_4x4}
+	\caption{A $4 \times 4$ CGRA is essentially a 2D grid of PEs, plus
+	data and instruction memories; each PE can operate on the results of
+	its neighbouring PEs, is built around an \textit{ALU} with a local register
+	file, and shares a global storage area in the data memory reserved
+	by the compiler. Figure reproduced from
+	Jeyapaul \textit{et al.}\cite{jeyapaul2011cgra}.}
+	\label{fig:cgra-4x4}
+\end{figure}
+
+\subsubsection{One-shot mapping validity}
+
+For a partition to be considered mappable, the SAT solver must find an
+assignment of nodes to PEs that satisfies the following conditions:
+
+Let $N$ be the set of instruction nodes of the partition, $E$ the set
+of instruction-to-instruction edges, and $P$ the set of PEs of the
+CGRA. For every $(n,e) \in N \times P$ we introduce a Boolean
+placement variable
+\[
+	p_{n,e} \in \{0,1\}, \qquad p_{n,e} = 1 \iff \text{node } n
+	\text{ is placed on PE } e.
+\]
+The mapping is then encoded by the following clauses:
+
+\paragraph{(C1) Operation compatibility.}
+For each node $n$ and each PE $e$ that does not support the opcode of
+$n$ (denoted $e \notin \mathit{ops}(n)$), the placement is forbidden:
+\begin{equation}
+	\forall n \in N,\ \forall e \in P,\
+	e \notin \mathit{ops}(n) \implies \neg p_{n,e}.
+\end{equation}
+
+\paragraph{(C2) Exactly one PE per instruction.}
+Each instruction node is placed on exactly one PE, enforced as a
+pseudo-Boolean equality:
+\begin{equation}
+	\forall n \in N,\ \sum_{e \in P} p_{n,e} = 1.
+\end{equation}
+
+\paragraph{(C3) At most one instruction per PE.}
+Each PE may host at most one instruction of the partition:
+\begin{equation}
+	\forall e \in P,\ \sum_{n \in N} p_{n,e} \leq 1.
+\end{equation}
+
+\paragraph{(C4) Same-cycle nearest-neighbour dependencies.}
+Let $\mathit{nbr}(a,b)$ denote that PEs $a$ and $b$ are directly
+connected in the CGRA topology (or that $a = b$ when the model allows
+intra-PE forwarding). For every internal dependency
+$u \rightarrow v \in E$, at least one feasible neighbouring assignment
+must be selected:
+\begin{equation}
+	\forall (u,v) \in E,\
+	\bigvee_{\substack{a,b \in P \\ \mathit{nbr}(a,b)}}
+	\bigl( p_{u,a} \wedge p_{v,b} \bigr).
+\end{equation}
+This is a simplification of SAT-MapIt's temporal forward-edge
+constraint: dependent instructions may share the same partition (and
+therefore the same one-shot cycle) as long as their PEs are physically
+adjacent.
+
+\paragraph{(C5) Memory-capable PEs.}
+For each memory node $n$ (\texttt{load} or \texttt{store}) and each PE
+$e$ that does not provide memory access ($e \notin \mathit{mem}$):
+\begin{equation}
+	\forall n \in N_{\mathit{mem}},\ \forall e \in P,\
+	e \notin \mathit{mem} \implies \neg p_{n,e}.
+\end{equation}
+In the current experiments we assume a homogeneous CGRA in which every
+PE supports every operation and every PE has memory access, so
+$\mathit{mem} = P$ and (C5) is always satisfied;
+
+\paragraph{Post-solution resource checks.}
+Fan-in, fan-out and physical-link capacity are not encoded in the SAT
+formulation. Once Z3 returns a model, the prototype reads back the
+placements and rejects any solution in which, for the chosen limits, a
+PE exceeds its outgoing or incoming edge budget, or a physical link
+between two PEs is used by more edges than its capacity. A violation
+here is reported back to the caller as an infeasible mapping rather
+than as a SAT failure.
+
+A structure such as $A \rightarrow C \leftarrow B$ is valid within a single
+partition if $A$, $B$ and $C$ are placed on compatible PEs and if the PEs of
+$A$ and $B$ can deliver their results directly to the PE of $C$, within the
+limits of $C$'s inputs and the physical links. It should be noted that the
+prototype covers spatial feasibility inside the partition, not temporal
+scheduling.
+
+\subsubsection{DFG partitioning}
+
+When the full DFG does not fit in a single CGRA configuration, the graph is
+split into a sequence of partitions $P_1, \ldots, P_K$. To preserve the order
+of the dependencies, the partitioner enforces:
+
+\begin{equation}
+partition(src) \leq partition(dest)
+\end{equation}
+
+for each edge $src \rightarrow dest$. This constraint prevents dependencies
+that would have to flow back to a previous partition.
+
+Two strategies were implemented:
+
+\begin{itemize}
+	\item \textbf{sat-min-k}: searches for the smallest feasible number of
+	      partitions, starting from a lower resource bound and validating each
+	      candidate via SAT;
+	\item \textbf{greedy}: builds a sequence of partitions through a greedy
+	      pass over the ready nodes, optionally using priorities provided by
+	      the LISA-GNN.
+\end{itemize}
+
+\subsubsection{Materialisation of inter-partition dependencies}
+
+An edge that crosses a partition boundary cannot be represented as a direct
+connection between PEs, because the two operations belong to distinct
+configurations. Therefore, each cut edge $u \rightarrow v$ is materialised as:
+
+\begin{center}
+\texttt{P\_i: u -> synthetic\_store}
+\hspace{1cm}
+\texttt{P\_j: synthetic\_load -> v}
+\end{center}
+
+The two synthetic nodes share the same logical memory reference. The overall
+approach is therefore a \textbf{partitioned one-shot mapping}: temporal
+decomposition between partitions, spatial \textit{mapping} within each
+partition.
+
+\subsubsection{LISA-GNN integration}
+
+The LISA-GNN integration follows the motivation of LISA\cite{lisa2022}:
+leveraging learned information about the DFG structure to guide the
+\textit{mapping}. In the prototype, the GNN predicts a per-node priority
+\textit{label0}, which defines the exploration order of the ready nodes in
+the greedy partitioner. The GNN does not replace the solver: the validity of
+the \textit{mapping} still depends on the structural constraints and the SAT
+verification.
+
+\subsection{Developed solution}
+
+The developed solution is a Python pipeline that takes a DFG and a CGRA
+description as input and produces, for each one-shot partition of the
+graph, a SAT-validated placement of the partition's instructions onto
+the PEs of the CGRA. The pipeline is organised in five stages, each
+implemented as an independent module and exercised by the same set of
+end-to-end tests:
+
+\begin{enumerate}
+	\item \textbf{DFG generation.} Either a synthetic graph is produced
+	      by the in-tree generator (\texttt{dfg\_gen}), or an existing
+	      JSON DFG is loaded from disk. The format follows the model
+	      described in Section~3.2.1 — instruction nodes, constant nodes
+	      and \texttt{load}/\texttt{store} memory nodes, with zero-distance
+	      data dependency edges.
+	\item \textbf{LISA-GNN inference (optional).} When enabled, the
+	      LISA-GNN module reads the DFG and produces a per-node
+	      \textit{label0} prediction, used downstream as a priority by
+	      the greedy partitioner.
+	\item \textbf{Partitioning.} The DFG is split into an ordered
+	      sequence $P_1, \ldots, P_K$ of subgraphs that respect the
+	      topological order of the original graph. Two strategies are
+	      available: \texttt{sat-min-k}, which probes increasing values
+	      of $K$ and validates each candidate via SAT, and the
+	      \textit{greedy} variant, optionally driven by the LISA-GNN
+	      priorities.
+	\item \textbf{Materialisation.} Each edge that crosses a partition
+	      boundary is rewritten as a pair of synthetic
+	      \texttt{store}/\texttt{load} nodes that share a logical memory
+	      reference, yielding one self-contained DFG per partition.
+	\item \textbf{SAT mapping.} Each materialised partition is handed to
+	      the SAT mapper described in Section~3.2.3, which either
+	      returns a valid placement or rejects the partition.
+\end{enumerate}
+
+The resulting artefacts are a sequence of per-partition JSON mappings,
+each one listing the PE assignment of every node together with the
+operand wiring (PE-to-PE links, immediate constants and memory
+references). This is the input consumed downstream by the code
+generation work developed in parallel by the team colleague.
+
+Two end-to-end examples are bundled with the prototype as smoke tests
+and reference inputs: a synthetic matrix multiplication kernel and a
+synthetic convolution kernel. Both fit in two one-shot partitions on a
+homogeneous $4 \times 4$ CGRA and exercise the full pipeline from DFG
+generation through SAT mapping. They are also the inputs used in the
+validation reported in the next subsection.
+Figures~\ref{fig:matmul-dfg} to~\ref{fig:conv-mapping} show, for each
+example, the original DFG, the partitioning produced by the pipeline,
+and the resulting placement on the $4 \times 4$ CGRA.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{matmul_dfg}
+	\caption{Synthetic DFG of matrix multiplication.}
+	\label{fig:matmul-dfg}
+\end{figure}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{matmul_split}
+	\caption{Partitioning of the matrix multiplication DFG into one-shot partitions.}
+	\label{fig:matmul-split}
+\end{figure}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{matmul_mapping}
+	\caption{Mapping of the matrix multiplication partitions onto a $4 \times 4$ CGRA.}
+	\label{fig:matmul-mapping}
+\end{figure}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{conv_dfg}
+	\caption{Synthetic convolution DFG.}
+	\label{fig:conv-dfg}
+\end{figure}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{conv_split}
+	\caption{Partitioning of the convolution DFG into one-shot partitions.}
+	\label{fig:conv-split}
+\end{figure}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{conv_mapping}
+	\caption{Mapping of the convolution partitions onto a $4 \times 4$ CGRA.}
+	\label{fig:conv-mapping}
+\end{figure}
+
+\subsection{Validation}
+
+
+\section{Conclusions}
+\glsadd{sdg}\glsadd{cgra}
+
+\subsection{Results achieved}
+
+\subsection{Lessons learned}
+
+\subsection{Future work}
+
+\subsection{SDG impact}
+
+The project aligns with SDG 9, Industry, Innovation and Infrastructure, by
+investigating compilation and optimisation techniques for reconfigurable
+architectures. More efficient mappings for CGRAs can reduce the energy
+consumption of computational workloads accelerated on this type of hardware,
+even though that gain was not quantified in this work.
 
 
 \bibliographystyle{plain}
