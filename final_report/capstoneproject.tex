@@ -69,13 +69,13 @@
 
 
 
-		Bachelor’s in Informatics and Computing Engineering
+		Bachelor's in Informatics and Computing Engineering
 
 		\vspace{0.8cm}
 
 
-		\textbf{U.Porto’s Tutor}: Professor João Cardoso\\
-		\textbf{Company’s Tutor}: Professor Nuno Paulino  \\
+		\textbf{U.Porto's Tutor}: Professor João Cardoso\\
+		\textbf{Company's Tutor}: Professor Nuno Paulino  \\
 
 		\vspace{0.4cm}
 		June 2026
@@ -103,11 +103,32 @@
 
 This report documents the work carried out in the Capstone Project course unit, part of the Bachelor's in Informatics and Computing Engineering at the Faculty of Engineering of the University of Porto (FEUP), during the second semester of the 2025/2026 academic year.
 
-The project was developed at \textbf{INESC TEC}, under the supervision of Professor Nuno Paulino and the tutorship of Professor João Cardoso. The goal was to investigate and implement an approach inspired by LISA\cite{lisa2022}, based on \textit{Graph Neural Networks} (GNNs), for the \textit{mapping} of \textit{Data Flow Graphs} (DFGs) onto \textit{Coarse-Grained Reconfigurable Architectures} (CGRAs).
+The project was developed at \textbf{INESC TEC}, under the supervision of Professor Nuno Paulino and the tutorship of Professor João Cardoso. INESC TEC is an associate laboratory active in engineering and computer science. The work was integrated in the \textit{Optical and Electronic Technologies} area of the \textbf{CTM} centre (Centre for Telecommunications and Multimedia), which hosts applied research in compilation and reconfigurable architectures, the areas in which this project is positioned.
 
-INESC TEC is an associate laboratory active in engineering and computer science, hosting applied research in compilation and reconfigurable architectures, which are the areas in which this project is positioned.
+The work is integrated in \textbf{AIMACOV}, an ongoing national research project of the host team. Within that effort I was inserted in a working group of five colleagues, accompanied on by the project's grant holders, who provided technical guidance throughout the semester.
 
+The goal was to investigate and implement an approach inspired by LISA\cite{lisa2022}, based on \textit{Graph Neural Networks} (GNNs), for the \textit{mapping} of \textit{Data Flow Graphs} (DFGs) onto \textit{Coarse-Grained Reconfigurable Architectures} (CGRAs).
 
+\subsection{Technical concepts}
+
+Before going further, this subsection gives a quick overview of the main ideas behind the project, so the rest of the report can be read without jumping to external references.
+
+\paragraph{CGRA.}
+A \textit{Coarse-Grained Reconfigurable Architecture} is a hardware accelerator made of a grid of small \textit{Processing Elements} (PEs), usually arranged as a 2D mesh. Each PE is basically an ALU with a tiny register file, and PEs talk to their direct neighbours through a fixed interconnect. The difference from an FPGA is the granularity: FPGAs are reconfigured at the bit level, while CGRAs are reconfigured at the word level. Each cycle, every PE is told which operation to run and where to read its operands from. This makes CGRAs a good fit for compute-heavy kernels with regular data flow, because they give up some of the flexibility of an FPGA in exchange for better energy efficiency and much smaller configuration data.
+
+\paragraph{Mapping process.}
+\textit{Mapping} is the compilation step that decides which PE runs each operation and, if cycles are also considered, when. The input is normally a \textit{Data Flow Graph} (DFG): a directed acyclic graph where nodes are operations and edges are data dependencies. The mapper has to respect three kinds of constraints: \emph{operation compatibility} (a node can only go on a PE that supports its opcode), \emph{connectivity} (if $u \to v$ is a dependency, the PEs assigned to $u$ and $v$ must be directly connected, or the value has to be routed through other PEs or memory), and \emph{resource limits} (no PE runs more than one operation in the same cycle, fan-in/fan-out budgets are respected, and so on). Mapping is NP-hard in general, so the literature has explored both exact approaches (SAT/ILP-based) and heuristics.
+
+\paragraph{Graph Neural Networks.}
+A \textit{Graph Neural Network} (GNN) is a type of neural network that works directly on graphs. Each node starts with a feature vector and, through several rounds of message passing, mixes in information from its neighbours. After a few rounds, each node ends up with an embedding that captures both its own features and the structure around it, which can then be used to predict per-node, per-edge or per-graph properties. GNNs fit DFG-based problems naturally, because the input is already a graph and the things one usually wants to predict (scheduling priorities, distances, placement hints) live on the nodes.
+
+\paragraph{LISA.}
+LISA\cite{lisa2022} is a GNN-based approach for mapping DFGs onto spatial accelerators. Instead of trying to solve the mapping itself, the GNN is trained on traces from a reference mapper to predict a few labels per DFG node, such as scheduling order and spatial/temporal distances to dependent nodes. These labels are then handed to a downstream mapper as priorities or constraints, which nudges it towards solutions similar to the reference flow while staying portable across different accelerator targets.
+
+\paragraph{SAT-MapIt.}
+SAT-MapIt\cite{satmapit2023} is an exact, SAT-based mapper for CGRAs. It encodes the mapping problem as Boolean constraints over placement variables, and uses a \textit{Kernel Mobility Schedule} (KMS), a modulo-scheduling construct that bounds the cycles in which each operation can be issued, to shrink the search space before the SAT solver kicks in. The output is either a correct mapping (placement plus modulo schedule) or a proof that no mapping exists for the given resource budget.
+
+In this project, LISA and SAT-MapIt are the two main references that the prototype combines: a LISA-style GNN provides per-node priorities, and a simplified, SAT-MapIt-inspired mapper checks each one-shot partition built from those priorities.
 
 \subsection{Goals and expected results}
 
@@ -589,8 +610,7 @@ Two end-to-end examples are bundled with the prototype as smoke tests
 and reference inputs: a synthetic matrix multiplication DFG and a
 synthetic convolution DFG. Both fit in two one-shot partitions on a
 homogeneous $4 \times 4$ CGRA and exercise the full pipeline from DFG
-generation through SAT mapping. They are also the inputs used in the
-validation reported in the next subsection.
+generation through SAT mapping.
 Figures~\ref{fig:matmul-dfg} to~\ref{fig:conv-mapping} show, for each
 example, the original DFG, the partitioning produced by the pipeline,
 and the resulting placement on the $4 \times 4$ CGRA.
