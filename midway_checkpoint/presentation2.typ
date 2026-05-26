@@ -27,25 +27,6 @@
 ]
 
 
-#slide(title: "Problema encontrado", outlined: true)[
-  #cols(columns: (1fr, 1fr), gutter: 2em)[
-    *SAT-MapIt*
-    - Construído em torno de _modulo scheduling_
-    - Assume um _Initiation Interval_ (II) e coloca operações ao longo de ciclos
-    - Reasoning sobre branches, _live-ins_/_live-outs_, KMS
-  ][
-    *LISA*
-    - Não emite diretamente um KMS ou schedule de _modulo scheduling_
-    - Prediz labels como ordem de scheduling e distâncias espaciais/temporais
-    - Vocabulário de operações mais reduzido
-  ]
-
-  #framed(title: "Conclusão")[
-    Por simplicidade e devido ao tempo limitado para o projeto integrador, simplificamos o problema de mapeamento para um cenário de _one-shot mapping_ sem II, KMS ou _modulo scheduling_.
-  ]
-]
-
-
 #slide(title: "Nova abordagem: partitioned one-shot", outlined: true)[
   Em vez de forçar LISA dentro do SAT-MapIt, #stress[invertemos] a ideia:
 
