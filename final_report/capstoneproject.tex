@@ -6,6 +6,9 @@
 \usepackage{graphicx}
 \usepackage{amsmath}
 \usepackage{booktabs}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{subcaption}
 \usepackage{float}
 \usepackage[hidelinks]{hyperref}
 \usepackage[nonumberlist=false,nopostdot,toc]{glossaries}
@@ -129,6 +132,9 @@ LISA\cite{lisa2022} is a GNN-based approach for mapping DFGs onto spatial accele
 SAT-MapIt\cite{satmapit2023} is an exact, SAT-based mapper for CGRAs. It encodes the mapping problem as Boolean constraints over placement variables, and uses a \textit{Kernel Mobility Schedule} (KMS), a modulo-scheduling construct that bounds the cycles in which each operation can be issued, to shrink the search space before the SAT solver kicks in. The output is either a correct mapping (placement plus modulo schedule) or a proof that no mapping exists for the given resource budget.
 
 In this project, LISA and SAT-MapIt are the two main references that the prototype combines: a LISA-style GNN provides per-node priorities, and a simplified, SAT-MapIt-inspired mapper checks each one-shot partition built from those priorities.
+
+\paragraph{Related approaches.}
+LISA is not the only learned approach to CGRA mapping. GRAFT\cite{10416096} predicts a placement distribution through GNN-based subgraph matching to steer a progressive graph-based mapper, reporting a $64.5\times$ mapping speedup over LISA with comparable or better mapping quality on CGRAs up to $16 \times 16$. Both LISA and GRAFT, however, assume the DFG fits within a single CGRA configuration and focus on accelerating placement and routing; neither addresses the partitioning problem that arises when this assumption does not hold. When a DFG exceeds the capacity of a single configuration, traditional approaches apply generic graph-partitioning algorithms such as the Kernighan-Lin heuristic or multi-level frameworks such as METIS\cite{karypis1998metis} to minimise edge cuts. These methods are agnostic to CGRA topology and routing constraints, so the partitions they produce are not guaranteed to be embeddable onto the target hardware. This project instead learns the partitioning step itself, predicting the partition structure prior to mapping.
 
 \subsection{Goals and expected results}
 
@@ -378,22 +384,42 @@ between PEs in the same configuration.
 
 \subsection{Architecture and technologies}
 
-The solution was implemented in Python and organised as a modular pipeline:
+The primary goal of the approach is to achieve the high partition quality of
+exact mathematical solvers while maintaining the low computational overhead of
+greedy heuristics. The solution was implemented in Python and organised as a
+flow with two distinct phases, as shown in Figure~\ref{fig:flow}: a training
+phase, in which a GNN learns optimal partition structure from exhaustively
+generated ground truth, and an inference phase, in which the trained GNN guides
+the partitioning of unseen DFGs with SAT-based spatial validation.
 
-\begin{center}
-	\texttt{DFG generation} $\rightarrow$
-	\texttt{LISA-GNN inference} $\rightarrow$
-	\texttt{partitioning} $\rightarrow$
-	\texttt{materialisation} $\rightarrow$
-	\texttt{SAT mapping}
-\end{center}
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{flow}
+	\caption{Overview of the proposed flow. The methodology is divided into
+		two distinct phases: training the GNN, and inference-time graph
+		partitioning with SAT-based spatial validation.}
+	\label{fig:flow}
+\end{figure}
 
-The generator creates synthetic data flow graphs. The LISA-GNN inference
-module computes predictions for the graph nodes. The partitioner receives the
-DFG, the CGRA description and, optionally, those predictions. The result is an
-ordered sequence of partitions, each one converted into a materialised DFG.
-Finally, each partition is verified by a SAT mapper implemented with
-Z3\cite{z3} and exported as a PE configuration.
+The flow comprises three stages: (1) synthetic graph generation, (2)
+ground-truth generation and GNN training, and (3) GNN-guided partitioning and
+spatial mapping. Stages (1) and (2) constitute the GNN training phase, and
+stage (3) represents the DFG partitioning inference.
+
+In summary, a GNN is trained to predict, for each instruction node of an input
+DFG, the partition it should belong to in an optimal split, that is, a split
+which minimises the inter-partition cut edges while maintaining spatial
+mappability on the target CGRA. To obtain a ground truth relating mapping
+quality to graph splits, an exhaustive \textsc{SAT-min-k} search is performed
+per training graph: every possible split is attempted and its mapping quality is
+recorded against the chosen split. The trained GNN then predicts, for an input
+test DFG, the best partition to which each node should belong, and adds this
+information as attributes on the nodes. A topology-aware partitioner processes
+the annotated graph, performing a final refinement to ensure mapping validity
+given the CGRA's hardware constraints. By reducing the mapping search space to
+an initial inferred solution, the DFG mapping time is reduced. Each partition is
+finally verified by a SAT mapper implemented with Z3\cite{z3} and exported as a
+PE configuration.
 
 \subsubsection{DFG model}
 
@@ -402,7 +428,51 @@ represent operations and the edges represent data dependencies. Constants are
 root nodes and memory operations are represented explicitly through
 \texttt{load} and \texttt{store}. In the current model, all edges have zero
 distance, that is, a dependency inside a partition must be satisfied in the
-same one-shot configuration.
+same one-shot configuration. The node types are drawn from a set of ten
+operations: arithmetic (\texttt{add}, \texttt{sub}, \texttt{mul}), bitwise
+logic (\texttt{and}, \texttt{or}, \texttt{xor}), shifts (\texttt{shl},
+\texttt{shr}), and memory operations (\texttt{load}, \texttt{store}). Immediate
+constants are modelled as dedicated constant nodes with a value sampled
+uniformly from $[-256, 256]$.
+
+\subsubsection{Synthetic graph generation}
+
+Training a GNN-based mapper requires a large corpus of labelled DFGs that span a
+representative range of kernel shapes, data-dependency structures and
+memory-access patterns, while remaining within the resource bounds of the
+target CGRA. Because hand-written or compiler-extracted benchmarks are too few
+and too uniform for this purpose, a parametric generator was built that produces
+synthetic DFGs by starting from a small kernel template and applying a sequence
+of structure-preserving mutations.
+
+Two loop-body templates seed the generator. The \emph{matrix-multiplication}
+template encodes the inner accumulation $c \mathrel{+}= a[k] \times b[k]$ as a
+six-node DAG: two loads feeding a \texttt{mul}, whose result is added to a third
+load and then written back by a \texttt{store}. The \emph{convolution} template
+encodes $y \mathrel{+}= w[k] \times (x[k] \mathrel{\ll} 2)$ and extends this
+chain with a constant node and a \texttt{shl} operation, yielding an eight-node
+seed. Both templates are acyclic, represent one inner loop iteration, have
+exactly one memory write, and satisfy all CGRA structural invariants by
+construction.
+
+To increase graph variability, the generator applies a sequence of graph
+mutations over the templates, partitioned into three structural classes:
+
+\begin{itemize}
+	\item \emph{Depth mutations} lengthen the critical path by inserting
+	      operations along existing producer-consumer chains, increasing
+	      pipeline depth.
+	\item \emph{Breadth mutations} introduce new parallel computation by
+	      branching live values into independent paths, merging independent
+	      values through binary operations, or adding fan-out to existing nodes
+	      without extending depth. These mutations increase ASAP-level width and
+	      routing pressure.
+	\item \emph{Neutral mutations} alter operations or operand types without
+	      changing graph topology, replacing nodes with others of the same type,
+	      or replacing a memory load with an immediate constant operand. These
+	      mutations increase operation-type diversity without affecting the
+	      graph's structural complexity.
+\end{itemize}
 
 \subsubsection{CGRA model}
 
@@ -428,50 +498,51 @@ and can operate on the results delivered by its neighbouring PEs.
 
 \subsubsection{One-shot mapping validity}
 
-For a partition to be considered mappable, the SAT solver must find an
-assignment of nodes to PEs that satisfies the following conditions:
+For a partition to be considered mappable, a custom SAT placement encoding,
+distinct from the modulo-scheduling formulation of SAT-MapIt\cite{satmapit2023},
+must find an assignment of nodes to PEs that satisfies the following conditions:
 
-Let $N$ be the set of instruction nodes of the partition, $E$ the set
-of instruction-to-instruction edges, and $P$ the set of PEs of the
-CGRA. For every $(n,e) \in N \times P$ we introduce a Boolean
-placement variable
+Let $V_I$ be the set of instruction nodes of the partition, $E_I$ the set of
+instruction-to-instruction edges, and $\mathcal{E}$ the set of PEs of the CGRA.
+For every $(v,e) \in V_I \times \mathcal{E}$ we introduce a Boolean placement
+variable
 \[
-	p_{n,e} \in \{0,1\}, \qquad p_{n,e} = 1 \iff \text{node } n
+	p_{v,e} \in \{0,1\}, \qquad p_{v,e} = 1 \iff \text{node } v
 	\text{ is placed on PE } e.
 \]
 The mapping is then encoded by the following clauses:
 
 \paragraph{(C1) Operation compatibility.}
-Let $\mathit{op}(n)$ denote the opcode of node $n$ and $\mathit{ops}(e)$
-the set of opcodes supported by PE $e$. For each node $n$ and each PE
-$e$ that does not support $\mathit{op}(n)$, the placement is forbidden:
+Let $\mathit{op}(v)$ denote the opcode of node $v$ and $\mathit{ops}(e)$
+the set of opcodes supported by PE $e$. For each node $v$ and each PE
+$e$ that does not support $\mathit{op}(v)$, the placement is forbidden:
 \begin{equation}
-	\forall n \in N,\ \forall e \in P,\
-	\mathit{op}(n) \notin \mathit{ops}(e) \implies \neg p_{n,e}.
+	\forall v \in V_I,\ \forall e \in \mathcal{E},\
+	\mathit{op}(v) \notin \mathit{ops}(e) \implies \neg p_{v,e}.
 \end{equation}
 
 \paragraph{(C2) Exactly one PE per instruction.}
 Each instruction node is placed on exactly one PE, enforced as a
 pseudo-Boolean equality:
 \begin{equation}
-	\forall n \in N,\ \sum_{e \in P} p_{n,e} = 1.
+	\forall v \in V_I,\ \sum_{e \in \mathcal{E}} p_{v,e} = 1.
 \end{equation}
 
 \paragraph{(C3) At most one instruction per PE.}
 Each PE may host at most one instruction of the partition:
 \begin{equation}
-	\forall e \in P,\ \sum_{n \in N} p_{n,e} \leq 1.
+	\forall e \in \mathcal{E},\ \sum_{v \in V_I} p_{v,e} \leq 1.
 \end{equation}
 
 \paragraph{(C4) Same-cycle nearest-neighbour dependencies.}
 Let $\mathit{nbr}(a,b)$ denote that PEs $a$ and $b$ are directly
 connected in the CGRA topology (or that $a = b$ when the model allows
 intra-PE forwarding). For every internal dependency
-$u \rightarrow v \in E$, at least one feasible neighbouring assignment
+$u \rightarrow v \in E_I$, at least one feasible neighbouring assignment
 must be selected:
 \begin{equation}
-	\forall (u,v) \in E,\
-	\bigvee_{\substack{a,b \in P \\ \mathit{nbr}(a,b)}}
+	\forall (u,v) \in E_I,\
+	\bigvee_{\substack{a,b \in \mathcal{E} \\ \mathit{nbr}(a,b)}}
 	\bigl( p_{u,a} \wedge p_{v,b} \bigr).
 \end{equation}
 This is a simplification of SAT-MapIt's temporal forward-edge
@@ -480,15 +551,17 @@ therefore the same one-shot cycle) as long as their PEs are physically
 adjacent.
 
 \paragraph{(C5) Memory-capable PEs.}
-For each memory node $n$ (\texttt{load} or \texttt{store}) and each PE
+For each memory node $v \in N_{\mathit{mem}}$ (where
+$N_{\mathit{mem}} = V_{\text{load}} \cup V_{\text{store}}$) and each PE
 $e$ that does not provide memory access ($e \notin \mathit{mem}$):
 \begin{equation}
-	\forall n \in N_{\mathit{mem}},\ \forall e \in P,\
-	e \notin \mathit{mem} \implies \neg p_{n,e}.
+	\forall v \in N_{\mathit{mem}},\ \forall e \in \mathcal{E},\
+	e \notin \mathit{mem} \implies \neg p_{v,e}.
 \end{equation}
-In the current experiments we assume a homogeneous CGRA in which every
-PE supports every operation and every PE has memory access, so
-$\mathit{mem} = P$ and (C5) is always satisfied;
+On the homogeneous target evaluated here every PE supports every operation and
+every PE has data-memory access, so $\mathit{mem} = \mathcal{E}$ and (C5) is
+inactive; it is retained for heterogeneous architectures with a memory-capable
+PE subset.
 
 \paragraph{Post-solution resource checks.}
 Fan-in, fan-out and physical-link capacity are not encoded in the SAT
@@ -509,27 +582,94 @@ scheduling.
 \subsubsection{DFG partitioning}
 
 When the input finite DFG does not fit in a single CGRA configuration, the graph is
-split into a sequence of partitions $P_1, \ldots, P_K$. To preserve the order
-of the dependencies, the partitioner enforces:
+split into a sequence of partitions $P_1, \ldots, P_K$. Because partitions
+execute sequentially, a value can only be read from an equal-or-earlier
+partition, so to preserve the order of the dependencies the partitioner enforces:
 
 \begin{equation}
 	partition(src) \leq partition(dest)
 \end{equation}
 
 for each edge $src \rightarrow dest$. This constraint prevents dependencies
-that would have to flow back to a previous partition.
+that would have to flow back to a previous partition. Only such \emph{monotone}
+assignments, which respect the topological order of the graph, are considered.
 
-Two strategies were implemented:
+\subsubsection{Ground-truth generation}
 
-\begin{itemize}
-	\item \textbf{sat-min-k}: probes increasing numbers of partitions,
-	      starting from a lower resource bound and validating each candidate
-	      via SAT. When the search is exhaustive, this proves the smallest
-	      feasible $K$ under the implemented model;
-	\item \textbf{greedy}: builds a sequence of partitions through a greedy
-	      pass over the ready nodes, optionally using priorities provided by
-	      the LISA-GNN.
-\end{itemize}
+After generating a set of DFGs, a training dataset for the GNN is built by
+systematic partition and mapping to valid solutions. A valid solution is defined
+by partitioning the DFG nodes into $K$ non-empty subsets. When edges are cut
+between these subsets they are transformed into synthetic \texttt{load}/%
+\texttt{store} pairs, and each resulting subset must then be successfully mapped.
+
+The objective of generating ground truth is to find the partition assignment
+$\sigma^*$ that jointly minimises the number of partitions $K$ and the number of
+cut edges, subject to CGRA constraints. Once $\sigma^*$ is found, each
+instruction node $v \in V_I$ is labelled with its assigned partition index
+$\sigma^*(v)$, which serves as the ground-truth target for the GNN's
+multi-class classification.
+
+To find this assignment, an exhaustive \textsc{SAT-min-k} search
+(Algorithm~\ref{alg:sat-min-k}) is performed over each synthetic DFG. The
+algorithm performs an upper-bounded sweep over $K$, starting from a
+resource-derived lower bound $K_{\min}$ (the instruction count $|V_I|$ divided by
+the number of PEs) up to $|V_I|$, the trivial case in which each partition
+contains a single instruction. For each value of $K$, all valid monotone
+assignments are enumerated exhaustively and SAT-checked, guaranteeing that the
+returned partition is minimal in $K$ and optimal in edge cuts among all feasible
+$K$-partition solutions.
+
+Each feasible partition is scored by the tuple:
+
+\begin{equation}
+	\mathcal{S}(\mathcal{P}) = \bigl(\,|\text{cut}(\mathcal{P})|,\; |V_{\text{syn}}|,\; \max_i f_i,\; \max_i \rho_i,\; \max_i \ell_i\,\bigr)
+	\label{eq:score}
+\end{equation}
+
+\noindent where $|\text{cut}(\mathcal{P})|$ is the number of cut edges,
+$|V_{\text{syn}}|$ the number of data transfers introduced by partitioning,
+$\max_i f_i$ the maximum frontier edge count across partitions, $\max_i \rho_i$
+the maximum PE occupancy, and $\max_i \ell_i$ the maximum physical link
+utilisation. Candidates are ranked lexicographically by $\mathcal{S}$, so cut
+minimisation is the primary objective and the remaining terms act as
+tiebreakers in order of priority. Among all feasible $K$-partition candidates,
+the one minimising $\mathcal{S}$ is selected as the ground-truth solution for
+that graph.
+
+\begin{algorithm}[H]
+	\caption{\textsc{SAT-min-k} Partitioning}\label{alg:sat-min-k}
+	\begin{algorithmic}
+		\Require DFG $G = (V, E)$, CGRA architecture $\mathcal{A}$
+		\Comment{$V_I \subseteq V$: instruction nodes}
+		\Ensure Minimum-$K$ feasible partition $\mathcal{P}^*$ with minimum edge cuts
+		\State $K_{\min} \leftarrow \lceil |V_I| / \text{capacity}(\mathcal{A}) \rceil$ \Comment{Resource lower bound}
+		\For{$K \in \{K_{\min}, \ldots, |V_I|\}$}
+		\For{each monotone assignment $\sigma : V_I \to [K]$ of instruction nodes to $K$ non-empty partitions}
+		\State Prune $\sigma$ if materialised resource usage is infeasible \Comment{Early rejection}
+		\State Deduplicate $\sigma$ against memoised isomorphic partitions \Comment{Cache Hit}
+		\State Construct partitions $\mathcal{P} = \{P_1, \ldots, P_K\}$ from $\sigma$
+		\State Materialise cut edges as synthetic \textit{load}/\textit{store} pairs
+		\If{$\mathcal{P}$ is structurally infeasible (routing or capacity)}
+		\State \textbf{continue}
+		\EndIf
+		\If{\textsc{SAT-based spatial mapper}($P_i$, $\mathcal{A}$) is feasible $\forall i \in [K]$}
+		\If{$\mathcal{S}(\mathcal{P}) < \mathcal{S}(\mathcal{P}^*)$}
+		\State $\mathcal{P}^* \leftarrow \mathcal{P}$ \Comment{lexicographic min, Eq.~\eqref{eq:score}}
+		\EndIf
+		\EndIf
+		\EndFor
+		\If{$\mathcal{P}^*$ is defined}
+		\State \Return $\mathcal{P}^*$ \Comment{Optimal $K$-partition; do not increment $K$}
+		\EndIf
+		\EndFor
+	\end{algorithmic}
+\end{algorithm}
+
+This exhaustive search yields provably optimal partition assignments, but its
+cost grows quickly with graph size, which is precisely why it is used only
+offline to generate ground truth rather than at inference time. A faster greedy
+partitioner, which builds a sequence of partitions through a single pass over
+the ready nodes, was also implemented as a baseline.
 
 \subsubsection{Materialisation of inter-partition dependencies}
 
@@ -552,15 +692,94 @@ approach is therefore a \textbf{partitioned one-shot mapping}: temporal
 decomposition between partitions, spatial \textit{mapping} within each
 partition.
 
-\subsubsection{LISA-GNN integration}
+\subsubsection{GNN training}
 
-The LISA-GNN integration follows the motivation of LISA\cite{lisa2022}:
-leveraging learned information about the DFG structure to guide the
-\textit{mapping}. In the prototype, the GNN predicts a per-node priority
-\textit{label0}, which defines the exploration order of the ready nodes in
-the greedy partitioner. The GNN does not replace the solver: the validity of
-the \textit{mapping} still depends on the structural constraints and the SAT
-verification.
+The ground-truth label assigned to each instruction node $v \in V_I$ is its
+partition index $\sigma^*(v) \in \{0, \ldots, K^*-1\}$ under the selected
+assignment $\sigma^*$, where $K^*$ is the minimum feasible $K$ returned by
+\textsc{SAT-min-k} (Algorithm~\ref{alg:sat-min-k}). Each node is encoded with
+the feature set introduced by LISA\cite{lisa2022}. The model is trained with
+inverse-frequency-weighted cross-entropy loss to compensate for the class
+imbalance arising from variable partition sizes across training graphs:
+
+\begin{equation}
+	\mathcal{L} = -\sum_{v \in V_I} w_{\sigma^*(v)} \log \hat{p}\bigl(\sigma^*(v) \mid v\bigr)
+	\label{eq:loss}
+\end{equation}
+
+\noindent where $\hat{p}(\cdot \mid v)$ is the softmax output of the classifier
+for node $v$ and $w_k \propto 1/|\{v : \sigma^*(v) = k\}|$ is the inverse class
+frequency weight for partition $k$.
+
+\subsubsection{GNN-guided partitioning and repair}
+
+At inference time, the trained GNN, a multi-layer GraphSAGE\cite{hamilton2017inductive}
+classifier, assigns each node $v \in V_I$ of an unseen DFG an initial partition
+index $\hat{\sigma}(v)$ (its \emph{seed}). These seeds do not directly guarantee
+mappable partitions, so a topology-aware partitioner refines them into a feasible
+one.
+
+\paragraph{Feasibility.}
+Each node carries an integer partition index, and the set of nodes sharing an
+index forms one partition; changing a node's index therefore moves it between
+partitions. A partition $P_i$ is \emph{feasible} when its materialised subgraph,
+including the synthetic \texttt{load}/\texttt{store} nodes introduced for cut
+edges, satisfies all of:
+\begin{enumerate}
+	\item node count, operation mix and memory port usage are within the
+	      resource caps of the target CGRA;
+	\item the number of outgoing cut edges does not exceed the configured
+	      frontier budget;
+	\item the materialised partition passes structural pre-SAT filters;
+	\item the materialised partition is accepted by the SAT-based spatial mapper.
+\end{enumerate}
+A partitioning is feasible when every partition is feasible. \emph{Repair} is
+the procedure that turns the raw GNN seeding into a feasible partitioning by
+adjusting the partition indices and, where necessary, splitting partitions.
+
+\paragraph{Guided partitioning and repair.}
+Rather than performing a conventional list-scheduling sweep, the partitioner
+takes all seeds $\hat{\sigma}$ at once and repairs them. It first makes the
+indices order-consistent: because partitions execute sequentially, a partition
+must be \emph{convex} (topologically contiguous), that is, no partition may hold
+a consumer placed before its producer. Each node is therefore pushed to at least
+one index beyond its latest instruction-valued predecessor:
+\begin{equation}
+	\pi(v) = \max\!\left(\hat{\sigma}(v),\;
+	\max_{(p \to v) \in E_I} \pi(p) + 1\right)
+	\label{eq:convex}
+\end{equation}
+Memory loads, which have no instruction-valued predecessor, are then pulled
+forward to their earliest consumer so they share a partition with their first
+use:
+\begin{equation}
+	\pi(\ell) = \min_{(\ell \to s) \in E_I}\, \pi(s)
+	\qquad \forall\, \ell \in V_{\text{load}}
+	\label{eq:load-pull}
+\end{equation}
+Convexification can leave empty indices; since an empty index would correspond
+to an empty, no-op configuration, the indices are compacted to a dense range
+$\{0, \ldots, K-1\}$, after which $K$ is the actual number of partitions.
+
+These partitions are then checked and repaired in index order, processed as a
+queue. A feasible partition is finalised immediately. An infeasible partition
+containing more than one node is split at its largest feasible topological
+prefix: the prefix is finalised, a synthetic \texttt{store}/\texttt{load} pair is
+materialised at the cut to represent the introduced cut edge, and the remaining
+suffix is re-enqueued at the front of the queue as a new candidate. Because a
+single instruction node is always mappable onto the target CGRA, this converges
+to a feasible partitioning, at the cost of at most one additional cut edge per
+split. The loop is bounded by a permissive safeguard of $4|V_I| + 16$
+iterations; exceeding it raises a partitioning error.
+
+\paragraph{Spatial mapping.}
+Once partitioning is complete, each feasible partition $P_i$ is mapped
+independently onto the CGRA by the SAT-based spatial mapper, with one SAT solve
+per partition. Since every partition is capacity-feasible by construction, each
+solve operates on a subgraph that fits within the CGRA's spatial resources,
+keeping solve time tractable independently of the size of the original DFG. The
+GNN does not replace the solver: the validity of the mapping still depends on the
+structural constraints and the SAT verification.
 
 \subsection{Developed solution}
 
@@ -578,18 +797,19 @@ end-to-end tests:
 	      described in Section~3.2.1 — instruction nodes, constant nodes
 	      and \texttt{load}/\texttt{store} memory nodes, with zero-distance
 	      data dependency edges.
-	\item \textbf{LISA-GNN inference (optional).} When enabled, the
-	      LISA-GNN module reads the DFG and produces a per-node
-	      \textit{label0} prediction, used downstream as a priority by
-	      the greedy partitioner.
+	\item \textbf{GNN inference.} The trained GraphSAGE classifier reads
+	      the DFG and produces a per-node partition index
+	      $\hat{\sigma}(v)$, used downstream as a seed by the topology-aware
+	      partitioner.
 	\item \textbf{Partitioning.} The DFG is split into an ordered
 	      sequence $P_1, \ldots, P_K$ of subgraphs that respect the
-	      topological order of the original graph. Two strategies are
-	      available: \texttt{sat-min-k}, which probes increasing values
-	      of $K$ and validates each candidate via SAT, proving the smallest
-	      feasible $K$ only when the search is exhaustive, and the
-	      \textit{greedy} variant, optionally driven by the LISA-GNN
-	      priorities.
+	      topological order of the original graph. The topology-aware
+	      partitioner seeds the layout from the GNN predictions and repairs
+	      it into a feasible partitioning through convexification and
+	      capacity repair. The offline \textsc{SAT-min-k} search, which
+	      probes increasing values of $K$ and validates each candidate via
+	      SAT to prove the smallest feasible $K$, is used to generate
+	      ground truth rather than at inference time.
 	\item \textbf{Materialisation.} Cross-partition dependencies are
 	      rewritten as synthetic memory operations: non-load producers use
 	      paired synthetic \texttt{store}/\texttt{load} nodes, while cuts
@@ -606,58 +826,161 @@ operand wiring (PE-to-PE links, immediate constants and memory
 references). This is the input consumed downstream by the code
 generation work developed in parallel by the team colleague.
 
-Two end-to-end examples are bundled with the prototype as smoke tests
-and reference inputs: a synthetic matrix multiplication DFG and a
-synthetic convolution DFG. Both fit in two one-shot partitions on a
-homogeneous $4 \times 4$ CGRA and exercise the full pipeline from DFG
-generation through SAT mapping.
-Figures~\ref{fig:matmul-dfg} to~\ref{fig:conv-mapping} show, for each
-example, the original DFG, the partitioning produced by the pipeline,
-and the resulting placement on the $4 \times 4$ CGRA.
-
-\begin{figure}[H]
-	\centering
-	\includegraphics[width=\textwidth]{matmul_dfg}
-	\caption{Synthetic DFG of matrix multiplication.}
-	\label{fig:matmul-dfg}
-\end{figure}
-
-\begin{figure}[H]
-	\centering
-	\includegraphics[width=\textwidth]{matmul_split}
-	\caption{Partitioning of the matrix multiplication DFG into one-shot partitions.}
-	\label{fig:matmul-split}
-\end{figure}
-
-\begin{figure}[H]
-	\centering
-	\includegraphics[width=\textwidth]{matmul_mapping}
-	\caption{Mapping of the matrix multiplication partitions onto a $4 \times 4$ CGRA.}
-	\label{fig:matmul-mapping}
-\end{figure}
-
-\begin{figure}[H]
-	\centering
-	\includegraphics[width=\textwidth]{conv_dfg}
-	\caption{Synthetic convolution DFG.}
-	\label{fig:conv-dfg}
-\end{figure}
-
-\begin{figure}[H]
-	\centering
-	\includegraphics[width=\textwidth]{conv_split}
-	\caption{Partitioning of the convolution DFG into one-shot partitions.}
-	\label{fig:conv-split}
-\end{figure}
-
-\begin{figure}[H]
-	\centering
-	\includegraphics[width=\textwidth]{conv_mapping}
-	\caption{Mapping of the convolution partitions onto a $4 \times 4$ CGRA.}
-	\label{fig:conv-mapping}
-\end{figure}
-
 \subsection{Validation}
+
+\subsubsection{Experimental setup}
+
+To evaluate the performance of the proposed GNN-guided partitioning framework, a
+$4 \times 4$ homogeneous CGRA was targeted, as described in
+Section~3.2.2 and shown in Figure~\ref{fig:cgra-4x4}.
+
+A dataset of 1650 DFGs was generated using the synthetic generator described
+above. Of these, 1500 graphs were used to produce ground-truth partition labels
+for GNN training, and the remaining 150 served as a held-out benchmark set for
+evaluating five mapping strategies. Highly parallelisable graphs impose higher
+partition counts and routing constraints that are difficult to satisfy under the
+spatial mapper's nearest-neighbour adjacency requirement (C4). To relax routing
+pressure and keep training tractable, the training set was biased toward
+moderately sized, low-to-medium parallelism graphs. Table~\ref{tab:dataset_stats}
+summarises the structural statistics of both splits; the two distributions are
+closely matched, confirming that the evaluation set is representative of the
+training distribution.
+
+\begin{table}[H]
+	\centering
+	\caption{Structural statistics of the training (1500 graphs) and evaluation
+		(150 graphs) dataset splits. All values reported as mean $\pm$ std
+		(min--max).}
+	\label{tab:dataset_stats}
+	\setlength{\tabcolsep}{4pt}
+	\begin{tabular}{lrr}
+		\toprule
+		\textbf{Metric} & \textbf{Training} & \textbf{Evaluation} \\
+		\midrule
+		Nodes                   & $22.51 \pm 3.31$ \ (16--28)    & $23.16 \pm 2.92$ \ (16--28)    \\
+		Edges                   & $21.77 \pm 3.39$ \ (15--29)    & $22.45 \pm 2.97$ \ (15--28)    \\
+		Depth                   & $8.19 \pm 1.32$ \ (6--13)      & $8.40 \pm 1.30$ \ (6--12)      \\
+		Parallelism             & $4.26 \pm 0.95$ \ (2--8)       & $4.19 \pm 0.97$ \ (2--7)       \\
+		Instr-Level Parallelism & $2.21 \pm 0.45$ \ (1.3--4.0)   & $2.21 \pm 0.48$ \ (1.3--3.8)   \\
+		Memory ratio            & $0.42 \pm 0.07$ \ (0.21--0.62) & $0.42 \pm 0.08$ \ (0.25--0.60) \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+Five partitioning strategies were evaluated to characterise the contribution of
+each component of the framework. \textsc{SAT-min-k} (Algorithm~\ref{alg:sat-min-k})
+serves as the optimal reference, performing an exhaustive search over all valid
+$K$-partition assignments and returning the minimum-cut solution at the smallest
+feasible $K$. A greedy list-scheduling partitioner is included as a fast
+baseline, building partitions in a single irreversible sweep without searching
+over alternative assignments, representative of conventional compilation
+heuristics. To isolate the contribution of the guided partitioner independently
+of the GNN, the topological strategy runs the topology-aware partitioner with no
+learned input: all nodes are seeded to partition $0$ and boundaries are
+determined entirely by the convexification and capacity repair steps. The
+\textsc{GNN-raw} strategy takes per-node partition indices predicted by the GNN
+and constructs partitions directly from these assignments without any
+convexification or feasibility repair, submitting them to the SAT-based spatial
+mapper as-is; this isolates the raw predictive quality of the GNN from the
+contribution of the repair procedure. Finally, the full \textsc{GNN-guided}
+strategy seeds the topology-aware partitioner with GNN predictions, combining
+learned partition structure with topology-aware repair, and constitutes the
+primary contribution of this work.
+
+The framework operates under two simplifying assumptions. Each partition is
+assumed to complete execution within a single CGRA configuration cycle,
+consistent with the one-shot mapping model of the SAT-based spatial mapper and a
+common assumption in spatial CGRA compilation; it does not account for
+multi-cycle operations or data-dependent latencies that would require a modulo
+scheduling pass. Cut edges are materialised as synthetic \texttt{store}/%
+\texttt{load} pairs at partition boundaries, implying a shared data memory for
+transferring live values between consecutive configurations. The framework does
+not model transfer latency or bandwidth, nor architectures using dedicated
+inter-configuration registers or FIFOs. The number of cut edges serves as a
+proxy for inter-partition communication overhead under the assumption that each
+synthetic memory pair incurs a uniform cost.
+
+\subsubsection{Experimental results}
+
+\begin{table}[H]
+	\centering
+	\caption{Benchmark results on the 150-graph evaluation set. $\dagger$ Greedy results are reported on its 23 successes only and are not directly comparable.}
+	\label{tab:benchmark_results}
+	\resizebox{\textwidth}{!}{
+		\begin{tabular}{lccccc}
+			\toprule
+			                       & \textsc{SAT-min-k}                          & Greedy                                  & Topological                          & \textsc{GNN-raw}                                  & \textsc{GNN-guided}                          \\
+			                       & \scriptsize{(exhaustive, iterative method)} & \scriptsize{(single-pass, no repair)}   & \scriptsize{(topo-aware, unguided)}  & \scriptsize{(single-pass, raw GNN predictions)}   & \scriptsize{(topo-aware, GNN-guided)}        \\
+			\midrule
+			Success rate           & $150/150$\ $(100\%)$                        & $23/150$\ $(15.3\%)$                    & $139/150$\ $(92.7\%)$                & $106/150$\ $(70.7\%)$                             & $147/150$\ $(98.0\%)$                        \\
+			\midrule
+			Mean edge cuts         & $1.31 \pm 0.09$                             & $1.52 \pm 0.37^\dagger$                 & $3.22 \pm 0.25$                      & $1.74 \pm 0.17$                                   & $2.15 \pm 0.20$                              \\
+			\midrule
+			Partitioning (s)       & $0.581 \pm 0.396$                           & $0.005 \pm 0.001$                       & $0.007 \pm 0.001$                    & $0.0004 \pm 0.00001$                              & $0.004 \pm 0.0004$                           \\
+			SAT mapping (s)        & $11.508 \pm 2.276$                          & $0.071 \pm 0.004$                       & $0.498 \pm 0.047$                    & $0.071 \pm 0.002$                                 & $0.243 \pm 0.039$                            \\
+			SAT checks / partition & $80.59 \pm 12.40$                           & $1.00 \pm 0.00$                         & $3.71 \pm 0.21$                      & $1.00 \pm 0.00$                                   & $2.36 \pm 0.11$                              \\
+			\bottomrule
+		\end{tabular}}
+\end{table}
+
+\begin{table}[H]
+	\centering
+	\caption{Benchmark results restricted to the 106 graphs solved by \textsc{GNN-raw}, i.e.\ the like-for-like subset for the \textsc{GNN-raw} vs.\ \textsc{GNN-guided} comparison. $\dagger$ Greedy results are reported on its 20 successes only and are not directly comparable.}
+	\label{tab:benchmark_common}
+	\resizebox{\textwidth}{!}{
+		\begin{tabular}{lccccc}
+			\toprule
+			                       & \textsc{SAT-min-k}                          & Greedy                                  & Topological                          & \textsc{GNN-raw}                                  & \textsc{GNN-guided}                          \\
+			                       & \scriptsize{(exhaustive, iterative method)} & \scriptsize{(single-pass, no repair)}   & \scriptsize{(topo-aware, unguided)}  & \scriptsize{(single-pass, raw GNN predictions)}   & \scriptsize{(topo-aware, GNN-guided)}        \\
+			\midrule
+			Success rate           & $106/106$\ $(100\%)$                        & $20/106$\ $(18.9\%)$                    & $100/106$\ $(94.3\%)$                & $106/106$\ $(100\%)$                              & $106/106$\ $(100\%)$                         \\
+			\midrule
+			Mean edge cuts         & $1.09 \pm 0.06$                             & $1.55 \pm 0.41^\dagger$                 & $3.00 \pm 0.29$                      & $1.74 \pm 0.17$                                   & $1.60 \pm 0.17$                              \\
+			\midrule
+			Partitioning (s)       & $0.089 \pm 0.013$                           & $0.005 \pm 0.001$                       & $0.005 \pm 0.0005$                   & $0.0003 \pm 0.00001$                              & $0.002 \pm 0.0001$                           \\
+			SAT mapping (s)        & $7.923 \pm 1.265$                           & $0.061 \pm 0.004$                       & $0.393 \pm 0.044$                    & $0.060 \pm 0.002$                                 & $0.133 \pm 0.028$                            \\
+			SAT checks / partition & $70.44 \pm 8.87$                            & $1.00 \pm 0.00$                         & $3.60 \pm 0.24$                      & $1.00 \pm 0.00$                                   & $2.01 \pm 0.02$                              \\
+			\bottomrule
+		\end{tabular}}
+\end{table}
+
+\paragraph{Feasibility.}
+The greedy strategy succeeds on only $15.3\%$ of graphs, confirming that
+single-pass list scheduling is not suited for wide, parallel DFGs.
+\textsc{GNN-raw}, which submits raw GNN predictions directly to the SAT mapper
+without any repair, achieves $70.7\%$, reflecting the current accuracy
+limitations of the GNN: predictions are occasionally structurally infeasible,
+but when they are valid they require no repair overhead. Both topology-aware
+variants achieve high feasibility rates, topological at $92.7\%$ and
+\textsc{GNN-guided} at $98.0\%$, demonstrating that the repair procedure alone
+largely solves the feasibility problem independently of the GNN.
+
+\paragraph{Partition quality.}
+\textsc{SAT-min-k} (Algorithm~\ref{alg:sat-min-k}) achieves a mean of $1.31$
+edge cuts per graph, establishing the optimality baseline. The topological
+strategy produces $3.22$ mean cuts, a gap of $1.91$ above optimal, which
+\textsc{GNN-guided} reduces to $2.15$ cuts, closing approximately $55\%$ of the
+gap. \textsc{GNN-raw} reports $1.74$ mean cuts, but only on the $106$
+structurally easier graphs it manages to solve, so this figure is not comparable
+to the others. Restricting all strategies to those same $106$ graphs
+(Table~\ref{tab:benchmark_common}) removes the bias: the optimum falls to
+$1.09$, and \textsc{GNN-guided} ($1.60$ cuts) produces \emph{fewer} cuts than
+\textsc{GNN-raw} ($1.74$), closing $73\%$ of the gap to the optimum versus $66\%$
+for the raw predictions. The repair procedure therefore improves partition
+quality on top of restoring feasibility, rather than degrading it; the apparent
+advantage of raw predictions on the full set was an artefact of their
+restriction to easier graphs.
+
+\paragraph{Runtime.}
+\textsc{GNN-raw} is the fastest non-trivial strategy: partitioning takes
+$0.4$\,ms and SAT mapping $0.07$\,s, matching greedy's per-partition cost since
+both submit exactly one SAT check per partition. \textsc{GNN-guided}
+(partitioning $4$\,ms, SAT mapping $0.24$\,s) is approximately $50\times$ faster
+end-to-end than \textsc{SAT-min-k} (Algorithm~\ref{alg:sat-min-k}) ($12.1$\,s
+total), while the topological strategy ($0.50$\,s SAT mapping) is slower than
+\textsc{GNN-guided} despite producing worse partitions, because a poor seed
+drives more feasibility-repair iterations and consequently more SAT checks per
+partition ($3.71$ vs.\ $2.36$).
 
 
 \section{Conclusions}
@@ -665,9 +988,73 @@ and the resulting placement on the $4 \times 4$ CGRA.
 
 \subsection{Results achieved}
 
+Beyond the prototype itself, the work culminated in a scientific communication
+that will be published at INForum 2026\footnote{\url{https://inforum.pt/}}, the
+Portuguese symposium on informatics, consolidating the framework and its
+evaluation into a contribution.
+
+This work produced a GNN-guided partitioning framework for spatial CGRA mapping
+that learns optimal partition structure from exhaustive SAT-generated ground
+truth. The flow addresses the case where the DFG does not fit within the CGRA:
+while most approaches focus on accelerating placement and routing, this work
+targets the pre-mapping partitioning phase. The framework makes three concrete
+contributions. First, a configurable synthetic DFG generator, which produces
+training graphs by applying structure-preserving mutations to kernel templates,
+enabling large-scale dataset generation without relying on compiler-extracted
+benchmarks. Second, an exhaustive \textsc{SAT-min-k} search
+(Algorithm~\ref{alg:sat-min-k}) that provides provably optimal partition
+assignments as ground-truth labels, ensuring the GNN learns from high-quality
+supervision. Third, a topology-aware guided partitioner that translates per-node
+GNN predictions into feasible partitions through convexification and capacity
+repair.
+
+Evaluation on a $4 \times 4$ homogeneous CGRA with five strategies shows that
+the \textsc{GNN-guided} flow is the strongest practical method. On the full
+evaluation set it achieves a $98\%$ feasibility rate and reduces mean edge cuts
+by $33\%$ relative to the unguided topological baseline, closing $55\%$ of the
+gap to the \textsc{SAT-min-k} optimum at roughly $50\times$ lower runtime. A
+like-for-like comparison on the $106$ graphs that \textsc{GNN-raw} also solves
+(Table~\ref{tab:benchmark_common}) clarifies the role of the repair procedure:
+once graph structure is controlled for, \textsc{GNN-guided} produces fewer cuts
+than \textsc{GNN-raw} ($1.60$ vs.\ $1.74$, against an optimum of $1.09$), closing
+$73\%$ of the gap to the optimum versus $66\%$ for the raw predictions. The
+apparent quality advantage of \textsc{GNN-raw} on the full set was therefore an
+artefact of its restriction to structurally easier graphs, not evidence that raw
+seeds are superior; repair both restores feasibility ($98\%$ vs.\ $70.7\%$) and
+lowers the cut count. The large gap between the unguided topological baseline
+($3.00$ cuts on the common subset) and both GNN-seeded variants confirms that the
+learned predictions carry strong partition structure, and the residual gap to the
+optimum reflects prediction error rather than a limitation of the repair
+mechanism.
+
 \subsection{Lessons learned}
 
+The most important lesson of the internship was that, in a research project, the
+problem statement is itself part of the work. The pipeline reported here is not
+the one envisioned at the start: it is the result of several rounds of
+simplification negotiated in the weekly meetings. Reproducing the LISA flow
+end-to-end was blocked by an \textit{LLVM} build dependency, the NaviMap
+direction was investigated and then dropped once its implementation and training
+cost proved disproportionate to its benefit at our scale, and the eventual
+decision to abstract the problem into one-shot partitioned mapping only emerged
+once it became clear that plugging LISA labels directly into a modulo-scheduling
+mapper such as SAT-MapIt was not straightforward. Committing early to a stable
+JSON interface with the parallel code-generation work also proved valuable, as it
+let the two efforts proceed without renegotiating the format. The recurring
+theme was that scoping the problem to match the available time, while keeping the
+core research idea intact, was as decisive as any single implementation choice.
+
 \subsection{Future work}
+
+Several directions remain open. The current evaluation targets a $4 \times 4$
+homogeneous CGRA; scaling to larger grids and heterogeneous architectures, where
+PEs support different ISA subsets, will stress both the GNN's generalisation and
+the repair procedure's routing assumptions. An alternative GNN formulation
+predicting cut probability per edge in addition to partition index per node could
+close the remaining quality gap more directly. Finally, the framework currently
+assumes single-cycle, one-shot execution per partition; integrating temporal or
+modulo scheduling would substantially broaden its applicability to real
+compilation workflows.
 
 \subsection{SDG impact}
 
