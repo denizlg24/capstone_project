@@ -1,0 +1,100 @@
+<svg width="440pt" height="174pt" viewBox="0.00 0.00 440.00 174.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 169.6)">
+<title>conv_template</title>
+<polygon fill="white" stroke="none" points="-4,4 -4,-169.6 436,-169.6 436,4 -4,4"/>
+<!-- loadW -->
+<g id="node1" class="node">
+<title>loadW</title>
+<ellipse fill="white" stroke="#333333" stroke-width="1.5" cx="122.4" cy="-136.8" rx="28.8" ry="28.8"/>
+<text xml:space="preserve" text-anchor="middle" x="122.4" y="-139.8" font-family="Arial" font-size="10.00">load</text>
+<text xml:space="preserve" text-anchor="middle" x="122.4" y="-127.8" font-family="Arial" font-size="10.00">W</text>
+</g>
+<!-- mul -->
+<g id="node6" class="node">
+<title>mul</title>
+<ellipse fill="#d6e8ff" stroke="#4a90e2" stroke-width="1.5" cx="216" cy="-100.8" rx="28.8" ry="28.8"/>
+<text xml:space="preserve" text-anchor="middle" x="216" y="-97.8" font-family="Arial" font-size="10.00">mul</text>
+</g>
+<!-- loadW&#45;&gt;mul -->
+<g id="edge3" class="edge">
+<title>loadW-&gt;mul</title>
+<path fill="none" stroke="#444444" d="M149.89,-126.39C159.29,-122.69 170.02,-118.48 180.02,-114.55"/>
+<polygon fill="#444444" stroke="#444444" points="187.43,-111.63 181.3,-117.91 184.84,-112.65 179.99,-114.56 179.99,-114.56 179.99,-114.56 184.84,-112.65 178.67,-111.21 187.43,-111.63"/>
+</g>
+<!-- loadX -->
+<g id="node2" class="node">
+<title>loadX</title>
+<ellipse fill="white" stroke="#333333" stroke-width="1.5" cx="28.8" cy="-100.8" rx="28.8" ry="28.8"/>
+<text xml:space="preserve" text-anchor="middle" x="28.8" y="-103.8" font-family="Arial" font-size="10.00">load</text>
+<text xml:space="preserve" text-anchor="middle" x="28.8" y="-91.8" font-family="Arial" font-size="10.00">X</text>
+</g>
+<!-- shl -->
+<g id="node5" class="node">
+<title>shl</title>
+<ellipse fill="#d6e8ff" stroke="#4a90e2" stroke-width="1.5" cx="122.4" cy="-64.8" rx="28.8" ry="28.8"/>
+<text xml:space="preserve" text-anchor="middle" x="122.4" y="-61.8" font-family="Arial" font-size="10.00">shl</text>
+</g>
+<!-- loadX&#45;&gt;shl -->
+<g id="edge1" class="edge">
+<title>loadX-&gt;shl</title>
+<path fill="none" stroke="#444444" d="M56.29,-90.39C65.69,-86.69 76.42,-82.48 86.42,-78.55"/>
+<polygon fill="#444444" stroke="#444444" points="93.83,-75.63 87.7,-81.91 91.24,-76.65 86.39,-78.56 86.39,-78.56 86.39,-78.56 91.24,-76.65 85.07,-75.21 93.83,-75.63"/>
+</g>
+<!-- loadY -->
+<g id="node3" class="node">
+<title>loadY</title>
+<ellipse fill="white" stroke="#333333" stroke-width="1.5" cx="216" cy="-28.8" rx="28.8" ry="28.8"/>
+<text xml:space="preserve" text-anchor="middle" x="216" y="-31.8" font-family="Arial" font-size="10.00">load</text>
+<text xml:space="preserve" text-anchor="middle" x="216" y="-19.8" font-family="Arial" font-size="10.00">Y</text>
+</g>
+<!-- add -->
+<g id="node7" class="node">
+<title>add</title>
+<ellipse fill="#d6e8ff" stroke="#4a90e2" stroke-width="1.5" cx="309.6" cy="-64.8" rx="28.8" ry="28.8"/>
+<text xml:space="preserve" text-anchor="middle" x="309.6" y="-61.8" font-family="Arial" font-size="10.00">add</text>
+</g>
+<!-- loadY&#45;&gt;add -->
+<g id="edge5" class="edge">
+<title>loadY-&gt;add</title>
+<path fill="none" stroke="#444444" d="M243.49,-39.21C252.89,-42.91 263.62,-47.12 273.62,-51.05"/>
+<polygon fill="#444444" stroke="#444444" points="281.03,-53.97 272.27,-54.39 278.44,-52.95 273.59,-51.04 273.59,-51.04 273.59,-51.04 278.44,-52.95 274.9,-47.69 281.03,-53.97"/>
+</g>
+<!-- offset -->
+<g id="node4" class="node">
+<title>offset</title>
+<ellipse fill="#fff2cc" stroke="#d6b656" stroke-width="1.5" cx="28.8" cy="-28.8" rx="28.8" ry="28.8"/>
+<text xml:space="preserve" text-anchor="middle" x="28.8" y="-31.8" font-family="Arial" font-size="10.00">const</text>
+<text xml:space="preserve" text-anchor="middle" x="28.8" y="-19.8" font-family="Arial" font-size="10.00">2</text>
+</g>
+<!-- offset&#45;&gt;shl -->
+<g id="edge2" class="edge">
+<title>offset-&gt;shl</title>
+<path fill="none" stroke="#444444" d="M56.29,-39.21C65.69,-42.91 76.42,-47.12 86.42,-51.05"/>
+<polygon fill="#444444" stroke="#444444" points="93.83,-53.97 85.07,-54.39 91.24,-52.95 86.39,-51.04 86.39,-51.04 86.39,-51.04 91.24,-52.95 87.7,-47.69 93.83,-53.97"/>
+</g>
+<!-- shl&#45;&gt;mul -->
+<g id="edge4" class="edge">
+<title>shl-&gt;mul</title>
+<path fill="none" stroke="#444444" d="M149.89,-75.21C159.29,-78.91 170.02,-83.12 180.02,-87.05"/>
+<polygon fill="#444444" stroke="#444444" points="187.43,-89.97 178.67,-90.39 184.84,-88.95 179.99,-87.04 179.99,-87.04 179.99,-87.04 184.84,-88.95 181.3,-83.69 187.43,-89.97"/>
+</g>
+<!-- mul&#45;&gt;add -->
+<g id="edge6" class="edge">
+<title>mul-&gt;add</title>
+<path fill="none" stroke="#444444" d="M243.49,-90.39C252.89,-86.69 263.62,-82.48 273.62,-78.55"/>
+<polygon fill="#444444" stroke="#444444" points="281.03,-75.63 274.9,-81.91 278.44,-76.65 273.59,-78.56 273.59,-78.56 273.59,-78.56 278.44,-76.65 272.27,-75.21 281.03,-75.63"/>
+</g>
+<!-- store -->
+<g id="node8" class="node">
+<title>store</title>
+<ellipse fill="#d4edda" stroke="#28a745" stroke-width="1.5" cx="403.2" cy="-64.8" rx="28.8" ry="28.8"/>
+<text xml:space="preserve" text-anchor="middle" x="403.2" y="-61.8" font-family="Arial" font-size="10.00">store</text>
+</g>
+<!-- add&#45;&gt;store -->
+<g id="edge7" class="edge">
+<title>add-&gt;store</title>
+<path fill="none" stroke="#444444" d="M339.08,-64.8C347.18,-64.8 356.13,-64.8 364.68,-64.8"/>
+<polygon fill="#444444" stroke="#444444" points="372.52,-64.8 364.52,-68.4 369.74,-64.8 364.52,-64.8 364.52,-64.8 364.52,-64.8 369.74,-64.8 364.52,-61.2 372.52,-64.8"/>
+</g>
+</g>
+</svg>

@@ -1,0 +1,31 @@
+Slide 1                                                                                                                                                                                       
+Olá, eu sou o Deniz, e neste vídeo vou apresentar o meu projeto integrador: GNN-Guided Graph Partitioning for Spatial CGRA Mapping. O objetivo foi estudar como técnicas de      
+inteligência artificial, em particular Graph Neural Networks, podem ajudar no mapeamento de DFG's para aceleradores, mais especificamente, CGRAs.                          
+                                                                                                                                                                                              
+Slide 2                                                                                                                                                                                       
+O problema de base é o mapeamento de um DFG para uma CGRA. Um DFG representa operações como nós e dependências de dados como arestas. O CGRA, por sua vez, é uma grelha de elementos de       
+processamento. O mapeador tem de decidir onde colocar cada operação, respeitando compatibilidade de operações, ligações entre elementos e limites de recursos. Quando o grafo é demasiado     
+grande ou difícil de colocar numa só configuração, é necessário parti-lo em subgrafos que continuem a ser mapeáveis.                                                                          
+                                                                                                                                                                                              
+Slide 3                                                                                                                                                                                       
+A abordagem partiu de duas referências principais. A primeira foi o LISA, que mostra que uma GNN pode aprender informação útil sobre grafos. A segunda foi o SAT-MapIt, que usa métodos exatos  para validar mapeamentos. Como integrar diretamente estes dois fluxos era demasiado complexo para o âmbito do projeto, a solução foi reformulada: usar a GNN para orientar a partição do      
+grafo, e usar SAT para confirmar se cada partição final é realmente válida.                                                                                                                   
+                                                                                                                                                                                              
+Slide 4                                                                                                                                                                                       
+A ferramenta implementada tem duas fases. Na fase de treino, são gerados DFGs sintéticos, depois é usado um processo exaustivo, chamado SAT-min-k, para produzir partições de referência. Essas    
+partições servem como labels para treinar um classificador GraphSAGE. Na fase de inferência, a GNN prevê o índice de partição de cada nó. Essa previsão não é usada cegamente: passa por um   
+particionador topology-aware, que corrige violações e repara partições que não sejam mapeáveis. No fim, cada partição é validada pelo mapeador SAT.                                           
+                                                                                                                                                                                              
+Slide 5                                                                                                                                                                                       
+Para obter dados suficientes, foram usados grafos sintéticos gerados a partir de templates de multiplicação de matrizes e convolução. No total foram gerados 1650 grafos: 1500 para treino e  
+geração de ground truth, e 150 para avaliação final. A ideia foi criar grafos variados, mas ainda suficientemente controlados para permitir a geração de labels através do método exaustivo.  
+                                                                                                                                                                                              
+Slide 6                                                                                                                                                                                       
+Na avaliação, comparei cinco estratégias. O SAT-min-k serve como referência de qualidade, mas é lento. O Greedy é rápido, mas só mapeou 15,3% dos grafos. O GNN-raw é muito rápido, mas falha 
+em vários casos porque usa diretamente as previsões da rede. A abordagem final, GNN-guided, mapeou 147 dos 150 grafos, ou seja, 98%, reduziu o número de cortes face ao método topológico sem 
+GNN, e foi cerca de 50 vezes mais rápida do que a pesquisa exaustiva.                                                                                                                         
+                                                                                                                                                                                              
+Slide 7                                                                                                                                                                                       
+Em conclusão, o principal resultado foi uma pipeline completa para mapeamento DFG-to-CGRA: geração de dados, labels com SAT, treino da GNN, reparação topology-aware e validação final. O     
+método não substitui o mapeamento exato, mas usa aprendizagem automática para guiar melhor a partição antes da validação. As limitações principais são o uso de um CGRA homogéneo 4 por 4,   
+grafos sintéticos e mapeamento one-shot. Como trabalho futuro, faria sentido testar grafos extraídos por compilador, CGRAs maiores e heterogéneas, e suporte para modulo scheduling.

@@ -1,0 +1,113 @@
+digraph AIMACOV_GNN_Flow {
+
+    rankdir=LR;
+    splines=polyline;
+    #splines=ortho;
+    nodesep=0.8;
+    ranksep=0.4;
+
+    graph [
+        fontname="Latin Modern Roman"
+        fontsize=12
+        bgcolor="white"
+    ];
+
+    node [
+        shape=box
+        style="rounded,filled"
+        fontname="Latin Modern Roman"
+        fontsize=12
+        margin="0.15,0.08"
+    ];
+
+    edge [
+        fontname="Latin Modern Roman"
+        fontsize=12
+        arrowsize=0.8
+    ];
+
+    // ============================================================
+    // TRAINING
+    // ============================================================
+    subgraph cluster_training {
+
+        label="(1) Training";
+        labelloc="t";
+        fontsize=12;
+        style="rounded";
+        color="gray50";
+
+        synth [
+            label="Synthetic DFG\nGeneration"
+            fillcolor="#F2F2F2"
+        ];
+
+        sat [
+            label="Exhaustive\nSAT-min-k Search"
+            fillcolor="#35E3E3"
+        ];
+
+        labels [
+            label="Labeled DFGs\n(partition index per node)"
+            fillcolor="#F2F2F2"
+        ];
+
+        gnn_train [
+            label="GraphSAGE\nClassifier Training"
+            fillcolor="#35E3E3"
+        ];
+
+        model [
+            label="Trained GNN\nModel"
+            fillcolor="#A8D8FF"
+        ];
+
+        synth -> sat -> labels -> gnn_train -> model;
+    }
+
+    // ============================================================
+    // INFERENCE
+    // ============================================================
+    subgraph cluster_inference {
+
+        label="(2) Inference";
+        labelloc="t";
+        fontsize=12;
+        style="rounded";
+        color="gray50";
+
+        unseen [
+            label="Unseen DFG"
+            fillcolor="#F2F2F2"
+        ];
+
+        infer [
+            label="GNN Inference\n(predict partition index)"
+            fillcolor="#35E3E3"
+        ];
+
+        repair [
+            label="Seeded Partitioner\n(convexify + repair)"
+            fillcolor="#35E3E3"
+        ];
+
+        mapped [
+            label="Mapped Partitions"
+            fillcolor="#F2F2F2"
+        ];
+
+        unseen -> infer -> repair -> mapped;
+    }
+
+    // Align first column
+    synth -> infer [
+        style=invis
+        weight=100
+    ];
+
+    model:s -> infer:s [
+        style=dashed
+        color="gray50"
+    ];
+    
+}
