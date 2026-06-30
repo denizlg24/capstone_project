@@ -18,7 +18,7 @@ Due to time constraints, the complexity of the problem, and the scope of the int
 
 \begin{figure}[t!]
     \centering
-    \includegraphics[width=0.35\linewidth]{output-figure0.pdf}
+    \includegraphics[width=0.4\linewidth]{output-figure0.pdf}
     \caption{Targeted $4\times4$ homogeneous CGRA: 16 PEs with full ALU capability and memory access, with nearest-neighbour connections.}
     \label{fig:cgra_arch}
 \end{figure}
@@ -231,7 +231,7 @@ As mentioned before, cut edges are represented as synthetic store/load operation
 
 \subsection{Developed solution}
 
-The final solution is a complete pipeline that takes a DFG and a CGRA description, generates annotations that are fed into the GNN which predicts partitions, repairs infeasible predictions, and validates the final partitions with a SAT-based mapper. The output is a set of valid partitions with PE assignments and operand connections, exported in JSON format for use in the code generation project.
+The final solution is a complete pipeline that takes a DFG and a CGRA description, generates annotations that are fed into the GNN which predicts partitions, repairs infeasible predictions, and validates the final partitions with a SAT-based mapper, as described in Figure \ref{fig:flow}. The output is a set of valid partitions with PE assignments and operand connections, exported in JSON format for use in the code generation project.
 
 % DRAFTING SUGGESTION:
 % Present the final prototype as someone using or integrating it would
@@ -372,7 +372,7 @@ SAT checks / part.
 \end{minipage}
 \end{table}
 
-Tables~\ref{tab:benchmark_results} and~\ref{tab:benchmark_common} summarise the benchmark results. On the full 150-graph evaluation set, the greedy baseline mapped only 23 graphs ($15.3$\%), while GNN-raw mapped 106 graphs ($70.7$\%), the topology-only repair mapped 139 graphs ($92.7$\%), and GNN-guided mapped 147 graphs ($98.0$\%). The mean edge cuts for the full set were $3.22$ for the unguided topological method, $2.15$ for GNN-guided, and $1.31$ for SAT-min-k. On this set, the GNN-raw approach seemed to show a slight improvement over the topological method, with $1.74$ mean cuts. To evaluate this improvement fairly, we restricted the comparison to the 106 graphs that GNN-raw could map in Table~\ref{tab:benchmark_common}. On this subset, GNN-guided achieved $1.60$ mean cuts versus $1.74$ for GNN-raw and $1.09$ for SAT-min-k. This shows that on the same set of graphs, the GNN-guided approach improves the learned split, and not just feasibility.
+Tables~\ref{tab:benchmark_results} and~\ref{tab:benchmark_common} summarise the benchmark results. On the full 150-graph evaluation set, the greedy baseline mapped only 23 graphs ($15.3$\%), while GNN-raw mapped 106 graphs ($70.7$\%), the topology-only repair mapped 139 graphs ($92.7$\%), and GNN-guided mapped 147 graphs ($98.0$\%). The mean edge cuts for the full set were $3.22$ for the unguided topological method, $2.15$ for GNN-guided, and $1.31$ for SAT-min-k. On the 150 graph set, the GNN-raw approach seemed to show a slight improvement over the topological method, with $1.74$ mean cuts. To evaluate this improvement fairly, we restricted the comparison to the 106 graphs that GNN-raw could map in Table~\ref{tab:benchmark_common}. On this subset, GNN-guided achieved $1.60$ mean cuts versus $1.74$ for GNN-raw and $1.09$ for SAT-min-k. This shows that on the same set of graphs, the GNN-guided approach improves the learned split, and not just feasibility, compared to pure GNN predictions.
 
 Regarding runtime, GNN-raw is the overall fastest strategy, partitioning takes $0.4$\,ms and SAT mapping $0.07$\,s, matching greedy's per-partition cost since both submit exactly one SAT check per partition. GNN-guided (partitioning $4$\,ms, SAT mapping $0.24$\,s) is approximately $50\times$ faster end-to-end than SAT-min-k ($12.1$\,s total), while the topological strategy ($0.50$\,s SAT mapping) is slower than \textsc{GNN-guided} despite producing worse partitions, because a poor seed drives more feasibility-repair iterations and consequently more SAT checks per partition.
 
@@ -412,7 +412,7 @@ Regarding runtime, GNN-raw is the overall fastest strategy, partitioning takes $
 
 Overall, I have successfully implemented a complete pipeline for DFG-to-CGRA mapping guided by a learned model. The work progressed from state-of-the-art study to a complete experimental prototype combining data generation, exact labelling, learned prediction, repair and SAT-based spatial validation. The central result is that learned guidance improved the feasibility and cut quality of the practical partitioner while remaining much faster than exhaustive search.
 
-The INForum 2026 paper is a project outcome, it communicates the research contribution and presents the results, whereas this report documents the complete internship process and my individual work. The Capstone Project was carried out individually in a team setting: I implemented and evaluated the mapping pipeline and wrote this report. Francisco developed the separate downstream code-generation project, while the supervisors guided technical decisions, reviewed results and co-authored/reviewed the scientific paper.
+The INForum 2026 submission (under review) is a project outcome, it communicates the research contribution and presents the results, whereas this report documents the complete internship process and my individual work. The Capstone Project was carried out individually in a team setting: I implemented and evaluated the mapping pipeline and wrote this report. Francisco developed the separate downstream code-generation project, while the supervisors guided technical decisions, reviewed results and co-authored/reviewed the scientific paper.
 
 % DRAFTING SUGGESTION:
 % Summarise the internship against its original goals. State that the work

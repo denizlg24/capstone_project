@@ -14,6 +14,7 @@
 \usepackage[hidelinks]{hyperref}
 \usepackage[nonumberlist=false,nopostdot,toc]{glossaries}
 \usepackage{svg}
+\usepackage{pdfpages}
 
 \graphicspath{{./figures/}}
 
@@ -46,8 +47,8 @@
 \newglossaryentry{alu}{name={ALU},description={\textit{Arithmetic Logic Unit}; combinational unit inside a PE that performs the arithmetic and logical operations of the supported opcodes.}}
 \newglossaryentry{llvm}{name={LLVM},description={Compiler infrastructure project providing modular and reusable compiler and toolchain technologies, used by the reference LISA flow.}}
 \newglossaryentry{leec}{name={L.EEC},description={\textit{Licenciatura em Engenharia Eletrot\'ecnica e de Computadores}; Bachelor's Degree in Electrical and Computer Engineering at FEUP.}}
-\newglossaryentry{cgrame}{name={CGRA-ME},description={\textit{CGRA Modelling and Exploration}; open-source CGRA design framework considered as an architecture reference in this project.}}
-\newglossaryentry{navimap}{name={NaviMap},description={GNN plus deep-Q-network mapping approach for CGRAs, considered and ultimately discarded as a third leg of the prototype.}}
+\newglossaryentry{cgrame}{name={CGRA-ME},description={\textit{CGRA Modelling and Exploration}~\cite{10596517}; open-source CGRA design framework considered as an architecture reference in this project.}}
+\newglossaryentry{navimap}{name={NaviMap},description={GNN plus deep-Q-network mapping approach for CGRAs, considered and ultimately discarded as a third leg of the prototype.}~\cite{11310964}}
 \newglossaryentry{dqn}{name={DQN},description={\textit{Deep Q-Network}; reinforcement learning agent that approximates the Q-function with a deep neural network.}}
 \newglossaryentry{satmink}{name={SAT-min-k},description={Exhaustive ground-truth generation procedure that searches for the minimum number of partitions needed to map a DFG.}}
 \newglossaryentry{graphsage}{name={GraphSAGE},description={GNN architecture used as the classifier for partition prediction.}}
@@ -100,6 +101,12 @@
 \tableofcontents
 
 \clearpage
+\section*{Summary}
+\addcontentsline{toc}{section}{Summary}
+
+This report presents the work developed during the Capstone Project, focused on GNN-guided graph partitioning for spatial CGRA mapping. The project investigates how Graph Neural Networks can be used to guide the partitioning of Data Flow Graphs before mapping each partition onto a Coarse-Grained Reconfigurable Array using a SAT-based mapper. The proposed flow combines learned partition guidance with feasibility checks, aiming to reduce cut edges while ensuring that the resulting partitions remain mappable on the target CGRA.
+
+\clearpage
 
 \printglossary[title=Glossary,toctitle=Glossary]
 
@@ -120,7 +127,7 @@ The goal was to investigate and implement an approach inspired by \gls{lisa}~\ci
 
 \subsection{Technical concepts}
 
-Before going further, this subsection gives a quick overview of the main ideas behind the project, so the rest of the report can be read without jumping to external references.
+Before going further, this subsection gives a quick overview of the main ideas behind the project, so the rest of the report can be read without the need of external references.
 
 \paragraph{CGRA.}
 A \textit{Coarse-Grained Reconfigurable Array} is a hardware accelerator made of a grid of small \textit{Processing Elements} (PEs), usually arranged as a 2D mesh. Each PE is basically an ALU with a tiny register file, and PEs talk to their direct neighbours through a fixed interconnect. The difference from an FPGA is the granularity: FPGAs are reconfigured at the bit level, while CGRAs are reconfigured at the word level. Each cycle, every PE is told which operation to run and where to read its operands from. This makes CGRAs a good fit for compute-heavy kernels with regular data flow, because they give up some of the flexibility of an FPGA in exchange for better energy efficiency and much smaller configuration data.
@@ -135,7 +142,7 @@ A \textit{Graph Neural Network} (GNN) is a type of neural network that works dir
 \gls{lisa}~\cite{lisa2022} is a GNN-based approach for mapping DFGs onto spatial accelerators. Instead of trying to solve the mapping itself, the GNN is trained on traces from a reference mapper to predict a few labels per DFG node, such as scheduling order and spatial/temporal distances to dependent nodes. These labels are then handed to a downstream mapper as constraints, which nudges it towards solutions similar to the reference flow while staying portable across different accelerator targets.
 
 \paragraph{SAT-MapIt.}
-\gls{satmapit}~\cite{satmapit2023} is an exact, SAT-based mapper for CGRAs. It encodes the mapping problem as Boolean constraints over placement variables, and uses a \textit{Kernel Mobility Schedule} (\gls{kms}), a modulo-scheduling construct that bounds the cycles in which each operation can be issued, to shrink the search space before the SAT solver kicks in. The output is either a correct mapping (placement plus modulo schedule) or a proof that no mapping exists for the given resource budget.
+\gls{satmapit}~\cite{satmapit2023} is an exact, SAT-based mapper for CGRAs. It encodes the mapping problem as Boolean constraints over placement variables, and uses a \textit{Kernel Mobility Schedule} (\gls{kms}), a modulo-scheduling construct that bounds the cycles in which each operation can be issued, to shrink the search space before the SAT solver executes. The output is either a correct mapping (placement plus modulo schedule) or a proof that no mapping exists for the given resource budget.
 
 In this project, LISA and SAT-MapIt are the two main references that the prototype combines: a LISA-style GNN provides per-node priorities, and a simplified, SAT-MapIt-inspired mapper checks each one-shot partition built from those priorities.
 
@@ -178,9 +185,9 @@ flexibility to work on the project remotely and to communicate with my
 supervisors and the rest of the team through a Slack\cite{slack} workspace
 that belongs to the team and to which I was invited.
 
-Throughout the process, weekly meetings were held in the INESC TEC room
+Throughout the process, weekly meetings were held in at INESC TEC
 in which I presented what had been accomplished during the week and we
-discussed the results and what should be addressed in the following one.
+discussed the results and what should be addressed during the following week.
 For these meetings I prepared a short presentation of about 5-10 minutes.
 These meetings were an opportunity not only to clarify questions about the
 project and its implementation, but also to receive feedback from the supervisors
@@ -230,7 +237,7 @@ The technical activities can be grouped into the following blocks:
 	\item \textbf{Study}: literature review on the state of the art on mapping DFGs to CGRAs, in particular approaches that leverage AI to improve mapping times.
 	\item \textbf{Development}: development of the proposed GNN-Guided Graph Partitioning for Spatial CGRA Mapping framework.
 	\item \textbf{Evaluation}: execution of a benchmark which compares the proposed approach with purely algorithmic methods, and evaluation of the results.
-	\item \textbf{Paper writing}: writing of a paper that describes the mapping approach which is submitted for publication in INForum 2026~\cite{inforum2026}.
+	\item \textbf{Scientific article}: preparation of a submission describing the mapping approach, which was submitted to the national conference INForum 2026~\cite{inforum2026} (at the time of writing this report, under review)
 \end{itemize}
 
 The initial phases (study, prototyping with state-of-the-art tools) took place between the start of the semester and mid-March;
@@ -266,9 +273,9 @@ possible.
 By the third meeting I had cloned the LISA~\cite{lisa2022} DFG generator
 and produced a first synthetic dataset of graphs. Reproducing the LISA
 flow end-to-end ran into a practical blocker: LISA itself relies on
-\textit{Gurobi} on top of an \textit{LLVM} build, and the \textit{LLVM} dependency could not be
+\textit{Gurobi}, another DFG Mapper, on top of an \textit{LLVM} build, and the \textit{LLVM} dependency could not be
 installed cleanly in the working environment. In parallel, I started
-reading SAT-MapIt~\cite{satmapit2023}, which uses a \textit{Kernel Mobility
+reviewing SAT-MapIt~\cite{satmapit2023}, which uses a \textit{Kernel Mobility
 	Schedule} (KMS), a construct from \textit{modulo scheduling} that bounds the
 cycles in which each operation may be issued, to reduce the SAT search
 space. The key idea that came out of this meeting was the one that ended up
@@ -283,8 +290,8 @@ reproduced for the homogeneous case: 1000 DFGs were generated for a
 $4 \times 4$ CGRA and another 1000 for an $8 \times 8$ CGRA, although
 mapping all of them with the reference flow turned out to be impractical
 (roughly 40 graphs mapped in a full day of runtime for the $4 \times 4$
-case). Second, I started reading \textit{NaviMap}, a GNN-plus-\textit{deep-Q-network}
-mapping approach, and we discussed whether the LISA labels could be fed
+case). Second, I started reading \textit{NaviMap}~\cite{11310964}, a GNN-plus-\textit{deep-Q-network}
+mapping approach, where a partial order-aware agent selects the next node to try to map and route, in an iterative fashion. We also discussed whether the LISA labels could be fed
 into a NaviMap-like agent. The idea was left open as a possible third
 leg of the prototype, to be evaluated in the following meeting after a
 deeper read of the paper.
@@ -314,7 +321,7 @@ consume it without further negotiation about the format.
 At this point I had a Python \texttt{CGRA} class that is passed to the
 mapper, LISA was producing four labels per node (used as features), and
 the experimental SAT path was using two of those labels (temporal and
-spatial distance) on top of a \textit{CGRA-ME}-style template to produce
+spatial distance) on top of a \textit{CGRA-ME}~\cite{10596517}-style template to produce
 reference mappings for that prototype stage. The meeting surfaced a real, recurring problem: the DFG
 formats used by LISA and by SAT-MapIt did not agree. LISA worked with a
 small set of operations (\texttt{const}, \texttt{load}, \texttt{store},
@@ -374,7 +381,18 @@ they formed a continuous writing and revision process.
 
 \input{report_body}
 
+\subsection{Acknowledgements}
+
+This work is financed by National Funds through the
+FCT -- Fundação para a Ciência e a Tecnologia, I.P.\ (Portuguese Foundation
+for Science and Technology) within the project AIMaCoV, with reference 2023.14899.PEX (\url{https://doi.org/10.54499/2023.14899.PEX}).
+
 \bibliographystyle{plain}
 \bibliography{refs} % Entries are in the refs.bib file
+
+% \appendix
+% \section{Annexes}
+
+% \includepdf[pages=-,pagecommand={\thispagestyle{plain}}]{Inforum2026_AIMapping.pdf}
 
 \end{document}
